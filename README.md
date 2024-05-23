@@ -1,4 +1,4 @@
-# VrDU-Doctor 
+# VrDU-Doctor :hospital::pill:
 **We research why and how VrDU Multimodal models answer what they answer**
 
 ## Introduction
@@ -6,11 +6,15 @@ Visually-rich Document Understanding (VrDU) consists of a Deep Learning (DL) Mod
 
 Humans have worked with different formats of documents since the beginning of History (inscriptions, cards, books, etc.). Nowadays, we still work with non-digital documents: we still receive a medical record when visiting the doctor or applying to the university with a transcript of records. On the other hand, our lives are increasingly digital: part of our relevant data is digital; therefore, we deal with data transfer from the analogical to the digital domain.
 
-There are multiple examples:
-+ :ticket: Purchase tickets :arrow_right: Splitwise/Tricount :dollar::calling:
-+ :bookmark_tabs: Transcript of records :arrow_right: University database :100: :bar_chart:
-+ :scroll: Your rental contract :arrow_right: Tax Agency :cop::moneybag:
+## Examples :mag_right:
 
+There are multiple application examples:
++ :ticket: Purchase tickets              :arrow_right:  Splitwise/Tricount :dollar::calling:
++ :bookmark_tabs: Transcript of records  :arrow_right:  University database :100: :bar_chart:
++ :scroll: Your rental contract          :arrow_right:  Tax Agency :cop::moneybag:
+
+
+## Hypothesis :thought_balloon:
 Recent contributions have shown the potential models that can automate data gathering and bridge the gap between the analogical and digital domains. Nevertheless, they have not paid much attention to answering some questions.
 
 + **What are the contributions of the multimodal parts?**
@@ -19,8 +23,6 @@ Recent contributions have shown the potential models that can automate data gath
 + **What is the perfect dataset size to fine-tune a VrDU model?**
 + **Could we achieve similar results, improving the quality and reducing the amount of pre-training data?**
 
-
-**Let's dive in** :dolphin:
 
 ## Models
 We are researching with one of the SOTA family models: LayoutLM. We expect to broaden our scope soon:
