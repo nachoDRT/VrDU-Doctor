@@ -1,3 +1,7 @@
 bruteforce/layoutxlm/config/huggingface_logging.json
-bruteforce/layoutxlm/config/wabdb_logging.json
+bruteforce/layoutxlm/config/wandb_logging.json
 bruteforce/layoutxlm/data
+
+single/layoutxlm/config/huggingface_logging.json
+single/layoutxlm/config/wandb_logging.json
+single/layoutxlm/data

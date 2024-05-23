@@ -1,0 +1,2 @@
+# Single Trainings
+In this folder, you can find everything you need to train a model on a single, specific dataset. Unlike Bruteforce, you only need to include the data you want the model to train on. You can adjust the train/val/test partitions, and every sample will be considered in the session.
