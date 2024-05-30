@@ -6,4 +6,4 @@ python src/format_dataset.py \
     --gather_train_val_data_from "app/data/train-val/" \
     --gather_test_data_from "app/data/test/"
 # find . | sed -e 's;[^/]*/;|____;g;s;____|; |;g'
-python src/train.py
+python src/train_loop.py
