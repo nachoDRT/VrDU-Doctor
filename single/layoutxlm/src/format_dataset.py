@@ -20,6 +20,7 @@ IMGS_DIR_SUFIX = "/images/"
 ANNOTATIONS_DIR_SUFIX = "/annotations/"
 
 MAX_WAVINESS = 4.5
+FILTER_SAMPLES = False
 
 ASSERT_TOLERANCE = 1e-3
 
@@ -239,17 +240,21 @@ def gather_files(gathering_paths: list):
                         for file in tqdm(os.listdir(annotations_path)):
                             file_name = file.split(".")[0]
                             file_name = check_file_name(file_name)
-                            waviness_value = float(
-                                blueprint_df.loc[
-                                    blueprint_df["file_name"] == file_name, "waviness"
-                                ].iloc[0]
-                            )
-                            words_out = blueprint_df.loc[
-                                blueprint_df["file_name"] == file_name, "words_out"
-                            ].iloc[0]
                             source_file = os.path.join(annotations_path, file)
                             dest_file = os.path.join(annotations_dir, file)
-                            if waviness_value < MAX_WAVINESS and not words_out:
+                            if FILTER_SAMPLES:
+                                waviness_value = float(
+                                    blueprint_df.loc[
+                                        blueprint_df["file_name"] == file_name,
+                                        "waviness",
+                                    ].iloc[0]
+                                )
+                                words_out = blueprint_df.loc[
+                                    blueprint_df["file_name"] == file_name, "words_out"
+                                ].iloc[0]
+                                if waviness_value < MAX_WAVINESS and not words_out:
+                                    shutil.copy(source_file, dest_file)
+                            else:
                                 shutil.copy(source_file, dest_file)
 
                         # Gather images
@@ -257,17 +262,21 @@ def gather_files(gathering_paths: list):
                         for file in tqdm(os.listdir(images_path)):
                             file_name = file.split(".")[0]
                             file_name = check_file_name(file_name)
-                            waviness_value = float(
-                                blueprint_df.loc[
-                                    blueprint_df["file_name"] == file_name, "waviness"
-                                ].iloc[0]
-                            )
-                            words_out = blueprint_df.loc[
-                                blueprint_df["file_name"] == file_name, "words_out"
-                            ].iloc[0]
                             source_file = os.path.join(images_path, file)
                             dest_file = os.path.join(images_dir, file)
-                            if waviness_value < MAX_WAVINESS and not words_out:
+                            if FILTER_SAMPLES:
+                                waviness_value = float(
+                                    blueprint_df.loc[
+                                        blueprint_df["file_name"] == file_name,
+                                        "waviness",
+                                    ].iloc[0]
+                                )
+                                words_out = blueprint_df.loc[
+                                    blueprint_df["file_name"] == file_name, "words_out"
+                                ].iloc[0]
+                                if waviness_value < MAX_WAVINESS and not words_out:
+                                    shutil.copy(source_file, dest_file)
+                            else:
                                 shutil.copy(source_file, dest_file)
                 else:
                     pass
