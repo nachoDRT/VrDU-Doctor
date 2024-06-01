@@ -3,6 +3,7 @@ import numpy as np
 import json
 import wandb
 import os
+import shutil
 import argparse
 from typing import Optional, Union
 from datasets import load_metric, load_dataset
@@ -16,6 +17,7 @@ from transformers import (
     PreTrainedTokenizerBase,
     TrainingArguments,
     Trainer,
+    TrainerCallback,
 )
 
 from transformers.file_utils import PaddingStrategy
@@ -30,7 +32,7 @@ DATASET_FOLDER = "/app/data/train-val/spanish/"
 MAX_TRAIN_STEPS = 100
 EVAL_FRECUENCY = 25
 LOGGING_STEPS = 1
-CONSISTENCY = 20
+CONSISTENCY = 2
 
 
 def get_dataset_name() -> str:
@@ -87,6 +89,12 @@ def compute_metrics(p):
             "f1": results["overall_f1"],
             "accuracy": results["overall_accuracy"],
         }
+
+
+def delete_gpu_data(model: LayoutLMv2ForTokenClassification, trainer: Trainer):
+    del model
+    del trainer
+    torch.cuda.empty_cache()
 
 
 @dataclass
@@ -150,6 +158,26 @@ class DataCollatorForTokenClassification:
         return batch
 
 
+class CustomCheckpointCallback(TrainerCallback):
+    def __init__(self, training_session_name):
+        self.training_session_name = training_session_name
+
+    def on_save(self, args, state, control, **kwargs):
+        custom_checkpoint_name = (
+            f"checkpoint_step_{state.global_step}_session_{self.training_session_name}"
+        )
+        custom_checkpoint_path = os.path.join(args.output_dir, custom_checkpoint_name)
+
+        if os.path.exists(custom_checkpoint_path):
+            shutil.rmtree(custom_checkpoint_path)
+
+        latest_checkpoint_path = os.path.join(
+            args.output_dir, f"checkpoint-{state.global_step}"
+        )
+        if os.path.exists(latest_checkpoint_path):
+            os.rename(latest_checkpoint_path, custom_checkpoint_path)
+
+
 if __name__ == "__main__":
     torch.cuda.empty_cache()
 
@@ -193,6 +221,11 @@ if __name__ == "__main__":
 
     dataloader = DataLoader(train_dataset, batch_size=4, collate_fn=data_collator)
 
+    output_dir = "/app/models_output"
+    if not os.path.exists(output_dir):
+        print(f"{output_dir} does not exist")
+        os.makedirs(output_dir)
+
     for i in range(CONSISTENCY):
 
         wandb.init(
@@ -210,7 +243,7 @@ if __name__ == "__main__":
         return_entity_level_metrics = False
 
         args = TrainingArguments(
-            output_dir="".join(["app/", wandb_config["project"]]),
+            output_dir="/app/models_output",
             max_steps=MAX_TRAIN_STEPS,
             learning_rate=2.5e-5,
             # warmup_ratio=0.1,
@@ -227,6 +260,7 @@ if __name__ == "__main__":
             report_to="wandb",
             load_best_model_at_end=True,
             save_total_limit=1,
+            save_steps=50,
         )
 
         # Initialize our Trainer
@@ -238,6 +272,7 @@ if __name__ == "__main__":
             tokenizer=tokenizer,
             data_collator=data_collator,
             compute_metrics=compute_metrics,
+            callbacks=[CustomCheckpointCallback(training_session_name)],
         )
 
         # Train
@@ -257,6 +292,4 @@ if __name__ == "__main__":
         )
         wandb.finish()
 
-        del model
-        del trainer
-        torch.cuda.empty_cache()
+        delete_gpu_data(model, trainer)

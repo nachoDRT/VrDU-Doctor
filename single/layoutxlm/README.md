@@ -6,7 +6,7 @@ docker build -f dockerfiles/rtx2080/Dockerfile -t layoutxlm .
 ```
 ### Run the docker in your GPU :boom:
 ```bash
-docker run -it --gpus '"device=0"' layoutxlm
+docker run -it --gpus '"device=0"' -v /host_path_to_save_models:/app/models_output layoutxlm
 ```
 
 # Nvidia RTX3090
@@ -17,7 +17,7 @@ docker build -f dockerfiles/rtx3090/Dockerfile -t layoutxlm .
 ```
 ### Run the docker in your GPU :boom:
 ```bash
-docker run -it --gpus '"device=0"' layoutxlm
+docker run -it --gpus '"device=0"' -v /host_path_to_save_models:/app/models_output layoutxlm
 ```
 
 
@@ -30,5 +30,5 @@ docker build -f dockerfiles/rtx4090/Dockerfile -t layoutxlm .
 
 ### Run the docker in your GPU :boom:
 ```bash
-docker run -it --gpus '"device=0"' layoutxlm
+docker run -it --gpus '"device=0"' -v /host_path_to_save_models:/app/models_output layoutxlm
 ```
