@@ -6,5 +6,5 @@ single/layoutxlm/config/huggingface_logging.json
 single/layoutxlm/config/wandb_logging.json
 single/layoutxlm/data
 
-postprocess/models/*/
-!postprocess/models/*.*
+analytics/models/*/
+!analytics/models/*.*
