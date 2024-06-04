@@ -1,0 +1,2506 @@
+{
+    "form": [
+        {
+            "box": [
+                336,
+                143,
+                590,
+                193
+            ],
+            "text": "CONSEJO",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        336,
+                        143,
+                        590,
+                        193
+                    ],
+                    "text": "CONSEJO"
+                }
+            ],
+            "linking": [],
+            "id": 0
+        },
+        {
+            "box": [
+                336,
+                210,
+                645,
+                260
+            ],
+            "text": "BRIT\u00c1NICO",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        336,
+                        210,
+                        645,
+                        260
+                    ],
+                    "text": "BRIT\u00c1NICO"
+                }
+            ],
+            "linking": [],
+            "id": 1
+        },
+        {
+            "box": [
+                155,
+                299,
+                665,
+                344
+            ],
+            "text": "COLEGIO BRIT\u00c1NICO",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        155,
+                        299,
+                        392,
+                        344
+                    ],
+                    "text": "COLEGIO"
+                },
+                {
+                    "box": [
+                        392,
+                        299,
+                        665,
+                        344
+                    ],
+                    "text": "BRIT\u00c1NICO"
+                }
+            ],
+            "linking": [],
+            "id": 2
+        },
+        {
+            "box": [
+                155,
+                360,
+                601,
+                410
+            ],
+            "text": "THE BRITISH WAY",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        155,
+                        360,
+                        272,
+                        410
+                    ],
+                    "text": "THE"
+                },
+                {
+                    "box": [
+                        272,
+                        360,
+                        487,
+                        410
+                    ],
+                    "text": "BRITISH"
+                },
+                {
+                    "box": [
+                        487,
+                        360,
+                        601,
+                        410
+                    ],
+                    "text": "WAY"
+                }
+            ],
+            "linking": [],
+            "id": 3
+        },
+        {
+            "box": [
+                1163,
+                154,
+                1483,
+                179
+            ],
+            "text": "Colegio Consejo Brit\u00e1nico",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        1163,
+                        154,
+                        1263,
+                        179
+                    ],
+                    "text": "Colegio"
+                },
+                {
+                    "box": [
+                        1263,
+                        154,
+                        1372,
+                        179
+                    ],
+                    "text": "Consejo"
+                },
+                {
+                    "box": [
+                        1372,
+                        154,
+                        1483,
+                        179
+                    ],
+                    "text": "Brit\u00e1nico"
+                }
+            ],
+            "linking": [],
+            "id": 4
+        },
+        {
+            "box": [
+                1163,
+                191,
+                1375,
+                216
+            ],
+            "text": "Colegio Brit\u00e1nico",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        1163,
+                        191,
+                        1263,
+                        216
+                    ],
+                    "text": "Colegio"
+                },
+                {
+                    "box": [
+                        1263,
+                        191,
+                        1375,
+                        216
+                    ],
+                    "text": "Brit\u00e1nico"
+                }
+            ],
+            "linking": [],
+            "id": 5
+        },
+        {
+            "box": [
+                1163,
+                227,
+                1375,
+                252
+            ],
+            "text": "C/ Salorino, n\u00ba 4",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        1163,
+                        227,
+                        1196,
+                        252
+                    ],
+                    "text": "C/"
+                },
+                {
+                    "box": [
+                        1196,
+                        227,
+                        1313,
+                        252
+                    ],
+                    "text": "Salorino,"
+                },
+                {
+                    "box": [
+                        1313,
+                        227,
+                        1350,
+                        252
+                    ],
+                    "text": "n\u00ba"
+                },
+                {
+                    "box": [
+                        1350,
+                        227,
+                        1375,
+                        252
+                    ],
+                    "text": "4"
+                }
+            ],
+            "linking": [],
+            "id": 6
+        },
+        {
+            "box": [
+                1163,
+                266,
+                1478,
+                291
+            ],
+            "text": "28743 Pozas de Alcorc\u00f3n",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        1163,
+                        266,
+                        1249,
+                        291
+                    ],
+                    "text": "28743"
+                },
+                {
+                    "box": [
+                        1249,
+                        266,
+                        1330,
+                        291
+                    ],
+                    "text": "Pozas"
+                },
+                {
+                    "box": [
+                        1330,
+                        266,
+                        1369,
+                        291
+                    ],
+                    "text": "de"
+                },
+                {
+                    "box": [
+                        1369,
+                        266,
+                        1478,
+                        291
+                    ],
+                    "text": "Alcorc\u00f3n"
+                }
+            ],
+            "linking": [],
+            "id": 7
+        },
+        {
+            "box": [
+                1163,
+                302,
+                1355,
+                327
+            ],
+            "text": "Madrid, Espa\u00f1a",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        1163,
+                        302,
+                        1266,
+                        327
+                    ],
+                    "text": "Madrid,"
+                },
+                {
+                    "box": [
+                        1263,
+                        302,
+                        1355,
+                        327
+                    ],
+                    "text": "Espa\u00f1a"
+                }
+            ],
+            "linking": [],
+            "id": 8
+        },
+        {
+            "box": [
+                1163,
+                338,
+                1383,
+                363
+            ],
+            "text": "+34 92 927 8712",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        1163,
+                        338,
+                        1224,
+                        363
+                    ],
+                    "text": "+34"
+                },
+                {
+                    "box": [
+                        1224,
+                        338,
+                        1263,
+                        363
+                    ],
+                    "text": "92"
+                },
+                {
+                    "box": [
+                        1263,
+                        338,
+                        1319,
+                        363
+                    ],
+                    "text": "927"
+                },
+                {
+                    "box": [
+                        1319,
+                        338,
+                        1383,
+                        363
+                    ],
+                    "text": "8712"
+                }
+            ],
+            "linking": [],
+            "id": 9
+        },
+        {
+            "box": [
+                155,
+                502,
+                949,
+                536
+            ],
+            "text": "Certificado Acad\u00e9mico de: Halima Mwangi Diop",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        155,
+                        502,
+                        347,
+                        536
+                    ],
+                    "text": "Certificado"
+                },
+                {
+                    "box": [
+                        347,
+                        502,
+                        542,
+                        536
+                    ],
+                    "text": "Acad\u00e9mico"
+                },
+                {
+                    "box": [
+                        542,
+                        502,
+                        606,
+                        536
+                    ],
+                    "text": "de:"
+                },
+                {
+                    "box": [
+                        606,
+                        502,
+                        734,
+                        536
+                    ],
+                    "text": "Halima"
+                },
+                {
+                    "box": [
+                        734,
+                        502,
+                        874,
+                        536
+                    ],
+                    "text": "Mwangi"
+                },
+                {
+                    "box": [
+                        874,
+                        502,
+                        949,
+                        536
+                    ],
+                    "text": "Diop"
+                }
+            ],
+            "linking": [],
+            "id": 10
+        },
+        {
+            "box": [
+                155,
+                572,
+                1419,
+                605
+            ],
+            "text": "D. Trinidad Prieto Herrero, responsable de la Direcci\u00f3n T\u00e9cnica del Colegio",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        155,
+                        572,
+                        203,
+                        605
+                    ],
+                    "text": "D."
+                },
+                {
+                    "box": [
+                        203,
+                        572,
+                        350,
+                        605
+                    ],
+                    "text": "Trinidad"
+                },
+                {
+                    "box": [
+                        350,
+                        572,
+                        459,
+                        605
+                    ],
+                    "text": "Prieto"
+                },
+                {
+                    "box": [
+                        459,
+                        572,
+                        606,
+                        605
+                    ],
+                    "text": "Herrero,"
+                },
+                {
+                    "box": [
+                        606,
+                        572,
+                        821,
+                        605
+                    ],
+                    "text": "responsable"
+                },
+                {
+                    "box": [
+                        821,
+                        572,
+                        874,
+                        605
+                    ],
+                    "text": "de"
+                },
+                {
+                    "box": [
+                        874,
+                        572,
+                        913,
+                        605
+                    ],
+                    "text": "la"
+                },
+                {
+                    "box": [
+                        913,
+                        572,
+                        1082,
+                        605
+                    ],
+                    "text": "Direcci\u00f3n"
+                },
+                {
+                    "box": [
+                        1082,
+                        572,
+                        1221,
+                        605
+                    ],
+                    "text": "T\u00e9cnica"
+                },
+                {
+                    "box": [
+                        1221,
+                        572,
+                        1283,
+                        605
+                    ],
+                    "text": "del"
+                },
+                {
+                    "box": [
+                        1283,
+                        572,
+                        1419,
+                        605
+                    ],
+                    "text": "Colegio"
+                }
+            ],
+            "linking": [],
+            "id": 11
+        },
+        {
+            "box": [
+                155,
+                611,
+                1486,
+                644
+            ],
+            "text": "Consejo Brit\u00e1nico, con domicilio en la calle Salorino n.\u00ba 4 de Pozas de Alcorc\u00f3n",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        155,
+                        611,
+                        300,
+                        644
+                    ],
+                    "text": "Consejo"
+                },
+                {
+                    "box": [
+                        300,
+                        611,
+                        470,
+                        644
+                    ],
+                    "text": "Brit\u00e1nico,"
+                },
+                {
+                    "box": [
+                        470,
+                        611,
+                        540,
+                        644
+                    ],
+                    "text": "con"
+                },
+                {
+                    "box": [
+                        540,
+                        611,
+                        701,
+                        644
+                    ],
+                    "text": "domicilio"
+                },
+                {
+                    "box": [
+                        701,
+                        611,
+                        754,
+                        644
+                    ],
+                    "text": "en"
+                },
+                {
+                    "box": [
+                        754,
+                        611,
+                        793,
+                        644
+                    ],
+                    "text": "la"
+                },
+                {
+                    "box": [
+                        793,
+                        611,
+                        882,
+                        644
+                    ],
+                    "text": "calle"
+                },
+                {
+                    "box": [
+                        882,
+                        611,
+                        1029,
+                        644
+                    ],
+                    "text": "Salorino"
+                },
+                {
+                    "box": [
+                        1029,
+                        611,
+                        1088,
+                        644
+                    ],
+                    "text": "n.\u00ba"
+                },
+                {
+                    "box": [
+                        1088,
+                        611,
+                        1119,
+                        644
+                    ],
+                    "text": "4"
+                },
+                {
+                    "box": [
+                        1119,
+                        611,
+                        1171,
+                        644
+                    ],
+                    "text": "de"
+                },
+                {
+                    "box": [
+                        1171,
+                        611,
+                        1277,
+                        644
+                    ],
+                    "text": "Pozas"
+                },
+                {
+                    "box": [
+                        1277,
+                        611,
+                        1330,
+                        644
+                    ],
+                    "text": "de"
+                },
+                {
+                    "box": [
+                        1330,
+                        611,
+                        1486,
+                        644
+                    ],
+                    "text": "Alcorc\u00f3n"
+                }
+            ],
+            "linking": [],
+            "id": 12
+        },
+        {
+            "box": [
+                155,
+                650,
+                1497,
+                683
+            ],
+            "text": "(Madrid), CERTIFICA: Que el/la alumno/a Halima Mwangi Diop, curs\u00f3 en nuestro",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        155,
+                        650,
+                        317,
+                        683
+                    ],
+                    "text": "(Madrid),"
+                },
+                {
+                    "box": [
+                        317,
+                        650,
+                        514,
+                        683
+                    ],
+                    "text": "CERTIFICA:"
+                },
+                {
+                    "box": [
+                        514,
+                        650,
+                        592,
+                        683
+                    ],
+                    "text": "Que"
+                },
+                {
+                    "box": [
+                        592,
+                        650,
+                        673,
+                        683
+                    ],
+                    "text": "el/la"
+                },
+                {
+                    "box": [
+                        673,
+                        650,
+                        840,
+                        683
+                    ],
+                    "text": "alumno/a"
+                },
+                {
+                    "box": [
+                        840,
+                        650,
+                        968,
+                        683
+                    ],
+                    "text": "Halima"
+                },
+                {
+                    "box": [
+                        968,
+                        650,
+                        1107,
+                        683
+                    ],
+                    "text": "Mwangi"
+                },
+                {
+                    "box": [
+                        1107,
+                        650,
+                        1205,
+                        683
+                    ],
+                    "text": "Diop,"
+                },
+                {
+                    "box": [
+                        1205,
+                        650,
+                        1305,
+                        683
+                    ],
+                    "text": "curs\u00f3"
+                },
+                {
+                    "box": [
+                        1305,
+                        650,
+                        1358,
+                        683
+                    ],
+                    "text": "en"
+                },
+                {
+                    "box": [
+                        1358,
+                        650,
+                        1497,
+                        683
+                    ],
+                    "text": "nuestro"
+                }
+            ],
+            "linking": [],
+            "id": 13
+        },
+        {
+            "box": [
+                155,
+                689,
+                1464,
+                722
+            ],
+            "text": "centro los siguientes cursos, obteniendo las calificaciones que a continuaci\u00f3n",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        155,
+                        689,
+                        275,
+                        722
+                    ],
+                    "text": "centro"
+                },
+                {
+                    "box": [
+                        275,
+                        689,
+                        331,
+                        722
+                    ],
+                    "text": "los"
+                },
+                {
+                    "box": [
+                        331,
+                        689,
+                        514,
+                        722
+                    ],
+                    "text": "siguientes"
+                },
+                {
+                    "box": [
+                        514,
+                        689,
+                        643,
+                        722
+                    ],
+                    "text": "cursos,"
+                },
+                {
+                    "box": [
+                        643,
+                        689,
+                        843,
+                        722
+                    ],
+                    "text": "obteniendo"
+                },
+                {
+                    "box": [
+                        843,
+                        689,
+                        901,
+                        722
+                    ],
+                    "text": "las"
+                },
+                {
+                    "box": [
+                        901,
+                        689,
+                        1135,
+                        722
+                    ],
+                    "text": "calificaciones"
+                },
+                {
+                    "box": [
+                        1135,
+                        689,
+                        1208,
+                        722
+                    ],
+                    "text": "que"
+                },
+                {
+                    "box": [
+                        1210,
+                        689,
+                        1241,
+                        722
+                    ],
+                    "text": "a"
+                },
+                {
+                    "box": [
+                        1241,
+                        689,
+                        1464,
+                        722
+                    ],
+                    "text": "continuaci\u00f3n"
+                }
+            ],
+            "linking": [],
+            "id": 14
+        },
+        {
+            "box": [
+                155,
+                728,
+                350,
+                761
+            ],
+            "text": "se detallan:",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        155,
+                        728,
+                        205,
+                        761
+                    ],
+                    "text": "se"
+                },
+                {
+                    "box": [
+                        205,
+                        728,
+                        350,
+                        761
+                    ],
+                    "text": "detallan:"
+                }
+            ],
+            "linking": [],
+            "id": 15
+        },
+        {
+            "box": [
+                481,
+                845,
+                612,
+                878
+            ],
+            "text": "3\u00ba ESO",
+            "label": "3_de_la_eso",
+            "words": [
+                {
+                    "box": [
+                        481,
+                        845,
+                        537,
+                        878
+                    ],
+                    "text": "3\u00ba"
+                },
+                {
+                    "box": [
+                        537,
+                        845,
+                        612,
+                        878
+                    ],
+                    "text": "ESO"
+                }
+            ],
+            "linking": [],
+            "id": 16
+        },
+        {
+            "box": [
+                292,
+                884,
+                801,
+                917
+            ],
+            "text": "Evaluaci\u00f3n final 2019-2020",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        292,
+                        884,
+                        506,
+                        917
+                    ],
+                    "text": "Evaluaci\u00f3n"
+                },
+                {
+                    "box": [
+                        506,
+                        884,
+                        601,
+                        917
+                    ],
+                    "text": "final"
+                },
+                {
+                    "box": [
+                        601,
+                        884,
+                        801,
+                        917
+                    ],
+                    "text": "2019-2020"
+                }
+            ],
+            "linking": [],
+            "id": 17
+        },
+        {
+            "box": [
+                434,
+                923,
+                659,
+                956
+            ],
+            "text": "Asignaturas",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        434,
+                        923,
+                        659,
+                        956
+                    ],
+                    "text": "Asignaturas"
+                }
+            ],
+            "linking": [],
+            "id": 18
+        },
+        {
+            "box": [
+                172,
+                970,
+                233,
+                995
+            ],
+            "text": "\u00c9tica",
+            "label": "educacion_etico_civica_3_de_la_eso",
+            "words": [
+                {
+                    "box": [
+                        172,
+                        970,
+                        233,
+                        995
+                    ],
+                    "text": "\u00c9tica"
+                }
+            ],
+            "linking": [],
+            "id": 19
+        },
+        {
+            "box": [
+                1105,
+                970,
+                1330,
+                995
+            ],
+            "text": "Insuficiente - 4.42",
+            "label": "educacion_etico_civica_3_de_la_eso_answer",
+            "words": [
+                {
+                    "box": [
+                        1105,
+                        970,
+                        1258,
+                        995
+                    ],
+                    "text": "Insuficiente"
+                },
+                {
+                    "box": [
+                        1258,
+                        970,
+                        1274,
+                        995
+                    ],
+                    "text": "-"
+                },
+                {
+                    "box": [
+                        1274,
+                        970,
+                        1330,
+                        995
+                    ],
+                    "text": "4.42"
+                }
+            ],
+            "linking": [],
+            "id": 20
+        },
+        {
+            "box": [
+                172,
+                1017,
+                615,
+                1042
+            ],
+            "text": "Historia del Mundo Contempor\u00e1neo",
+            "label": "ciencias_del_mundo_3_de_la_eso",
+            "words": [
+                {
+                    "box": [
+                        172,
+                        1017,
+                        275,
+                        1042
+                    ],
+                    "text": "Historia"
+                },
+                {
+                    "box": [
+                        275,
+                        1017,
+                        322,
+                        1042
+                    ],
+                    "text": "del"
+                },
+                {
+                    "box": [
+                        322,
+                        1017,
+                        414,
+                        1042
+                    ],
+                    "text": "Mundo"
+                },
+                {
+                    "box": [
+                        414,
+                        1017,
+                        615,
+                        1042
+                    ],
+                    "text": "Contempor\u00e1neo"
+                }
+            ],
+            "linking": [],
+            "id": 21
+        },
+        {
+            "box": [
+                1105,
+                1017,
+                1330,
+                1042
+            ],
+            "text": "Insuficiente - 4.83",
+            "label": "ciencias_del_mundo_3_de_la_eso_answer",
+            "words": [
+                {
+                    "box": [
+                        1105,
+                        1017,
+                        1258,
+                        1042
+                    ],
+                    "text": "Insuficiente"
+                },
+                {
+                    "box": [
+                        1258,
+                        1017,
+                        1274,
+                        1042
+                    ],
+                    "text": "-"
+                },
+                {
+                    "box": [
+                        1274,
+                        1017,
+                        1330,
+                        1042
+                    ],
+                    "text": "4.83"
+                }
+            ],
+            "linking": [],
+            "id": 22
+        },
+        {
+            "box": [
+                172,
+                1065,
+                258,
+                1090
+            ],
+            "text": "M\u00fasica",
+            "label": "musica_3_de_la_eso",
+            "words": [
+                {
+                    "box": [
+                        172,
+                        1065,
+                        258,
+                        1090
+                    ],
+                    "text": "M\u00fasica"
+                }
+            ],
+            "linking": [],
+            "id": 23
+        },
+        {
+            "box": [
+                1105,
+                1065,
+                1330,
+                1090
+            ],
+            "text": "Insuficiente - 2.55",
+            "label": "musica_3_de_la_eso_answer",
+            "words": [
+                {
+                    "box": [
+                        1105,
+                        1065,
+                        1258,
+                        1090
+                    ],
+                    "text": "Insuficiente"
+                },
+                {
+                    "box": [
+                        1258,
+                        1065,
+                        1274,
+                        1090
+                    ],
+                    "text": "-"
+                },
+                {
+                    "box": [
+                        1274,
+                        1065,
+                        1330,
+                        1090
+                    ],
+                    "text": "2.55"
+                }
+            ],
+            "linking": [],
+            "id": 24
+        },
+        {
+            "box": [
+                172,
+                1112,
+                244,
+                1137
+            ],
+            "text": "Ingl\u00e9s",
+            "label": "ingles_3_de_la_eso",
+            "words": [
+                {
+                    "box": [
+                        172,
+                        1112,
+                        244,
+                        1137
+                    ],
+                    "text": "Ingl\u00e9s"
+                }
+            ],
+            "linking": [],
+            "id": 25
+        },
+        {
+            "box": [
+                1105,
+                1112,
+                1330,
+                1137
+            ],
+            "text": "Insuficiente - 4.25",
+            "label": "ingles_3_de_la_eso_answer",
+            "words": [
+                {
+                    "box": [
+                        1105,
+                        1112,
+                        1258,
+                        1137
+                    ],
+                    "text": "Insuficiente"
+                },
+                {
+                    "box": [
+                        1258,
+                        1112,
+                        1274,
+                        1137
+                    ],
+                    "text": "-"
+                },
+                {
+                    "box": [
+                        1274,
+                        1112,
+                        1330,
+                        1137
+                    ],
+                    "text": "4.25"
+                }
+            ],
+            "linking": [],
+            "id": 26
+        },
+        {
+            "box": [
+                172,
+                1159,
+                272,
+                1184
+            ],
+            "text": "Biolog\u00eda",
+            "label": "biologia_3_de_la_eso",
+            "words": [
+                {
+                    "box": [
+                        172,
+                        1159,
+                        272,
+                        1184
+                    ],
+                    "text": "Biolog\u00eda"
+                }
+            ],
+            "linking": [],
+            "id": 27
+        },
+        {
+            "box": [
+                1105,
+                1159,
+                1330,
+                1184
+            ],
+            "text": "Insuficiente - 3.97",
+            "label": "biologia_3_de_la_eso_answer",
+            "words": [
+                {
+                    "box": [
+                        1105,
+                        1159,
+                        1258,
+                        1184
+                    ],
+                    "text": "Insuficiente"
+                },
+                {
+                    "box": [
+                        1258,
+                        1159,
+                        1274,
+                        1184
+                    ],
+                    "text": "-"
+                },
+                {
+                    "box": [
+                        1274,
+                        1159,
+                        1330,
+                        1184
+                    ],
+                    "text": "3.97"
+                }
+            ],
+            "linking": [],
+            "id": 28
+        },
+        {
+            "box": [
+                172,
+                1207,
+                256,
+                1232
+            ],
+            "text": "Griego",
+            "label": "griego_3_de_la_eso",
+            "words": [
+                {
+                    "box": [
+                        172,
+                        1207,
+                        256,
+                        1232
+                    ],
+                    "text": "Griego"
+                }
+            ],
+            "linking": [],
+            "id": 29
+        },
+        {
+            "box": [
+                1149,
+                1207,
+                1286,
+                1232
+            ],
+            "text": "Bien - 6.58",
+            "label": "griego_3_de_la_eso_answer",
+            "words": [
+                {
+                    "box": [
+                        1149,
+                        1207,
+                        1210,
+                        1232
+                    ],
+                    "text": "Bien"
+                },
+                {
+                    "box": [
+                        1210,
+                        1207,
+                        1230,
+                        1232
+                    ],
+                    "text": "-"
+                },
+                {
+                    "box": [
+                        1230,
+                        1207,
+                        1286,
+                        1232
+                    ],
+                    "text": "6.58"
+                }
+            ],
+            "linking": [],
+            "id": 30
+        },
+        {
+            "box": [
+                172,
+                1254,
+                314,
+                1279
+            ],
+            "text": "Inform\u00e1tica",
+            "label": "informatica_3_de_la_eso",
+            "words": [
+                {
+                    "box": [
+                        172,
+                        1254,
+                        314,
+                        1279
+                    ],
+                    "text": "Inform\u00e1tica"
+                }
+            ],
+            "linking": [],
+            "id": 31
+        },
+        {
+            "box": [
+                1110,
+                1254,
+                1322,
+                1279
+            ],
+            "text": "Insuficiente - 4.4",
+            "label": "informatica_3_de_la_eso_answer",
+            "words": [
+                {
+                    "box": [
+                        1110,
+                        1254,
+                        1263,
+                        1279
+                    ],
+                    "text": "Insuficiente"
+                },
+                {
+                    "box": [
+                        1263,
+                        1254,
+                        1280,
+                        1279
+                    ],
+                    "text": "-"
+                },
+                {
+                    "box": [
+                        1283,
+                        1254,
+                        1322,
+                        1279
+                    ],
+                    "text": "4.4"
+                }
+            ],
+            "linking": [],
+            "id": 32
+        },
+        {
+            "box": [
+                172,
+                1301,
+                423,
+                1326
+            ],
+            "text": "Geograf\u00eda e Historia",
+            "label": "geografia_e_historia_3_de_la_eso",
+            "words": [
+                {
+                    "box": [
+                        172,
+                        1301,
+                        303,
+                        1326
+                    ],
+                    "text": "Geograf\u00eda"
+                },
+                {
+                    "box": [
+                        303,
+                        1301,
+                        325,
+                        1326
+                    ],
+                    "text": "e"
+                },
+                {
+                    "box": [
+                        325,
+                        1301,
+                        423,
+                        1326
+                    ],
+                    "text": "Historia"
+                }
+            ],
+            "linking": [],
+            "id": 33
+        },
+        {
+            "box": [
+                1105,
+                1301,
+                1330,
+                1326
+            ],
+            "text": "Insuficiente - 3.68",
+            "label": "geografia_e_historia_3_de_la_eso_answer",
+            "words": [
+                {
+                    "box": [
+                        1105,
+                        1301,
+                        1258,
+                        1326
+                    ],
+                    "text": "Insuficiente"
+                },
+                {
+                    "box": [
+                        1258,
+                        1301,
+                        1274,
+                        1326
+                    ],
+                    "text": "-"
+                },
+                {
+                    "box": [
+                        1274,
+                        1301,
+                        1330,
+                        1326
+                    ],
+                    "text": "3.68"
+                }
+            ],
+            "linking": [],
+            "id": 34
+        },
+        {
+            "box": [
+                172,
+                1349,
+                498,
+                1374
+            ],
+            "text": "Matem\u00e1ticas (en espa\u00f1ol)",
+            "label": "matematicas_3_de_la_eso",
+            "words": [
+                {
+                    "box": [
+                        172,
+                        1349,
+                        339,
+                        1374
+                    ],
+                    "text": "Matem\u00e1ticas"
+                },
+                {
+                    "box": [
+                        339,
+                        1349,
+                        389,
+                        1374
+                    ],
+                    "text": "(en"
+                },
+                {
+                    "box": [
+                        389,
+                        1349,
+                        498,
+                        1374
+                    ],
+                    "text": "espa\u00f1ol)"
+                }
+            ],
+            "linking": [],
+            "id": 35
+        },
+        {
+            "box": [
+                1105,
+                1349,
+                1330,
+                1374
+            ],
+            "text": "Insuficiente - 3.95",
+            "label": "matematicas_3_de_la_eso_answer",
+            "words": [
+                {
+                    "box": [
+                        1105,
+                        1349,
+                        1258,
+                        1374
+                    ],
+                    "text": "Insuficiente"
+                },
+                {
+                    "box": [
+                        1258,
+                        1349,
+                        1274,
+                        1374
+                    ],
+                    "text": "-"
+                },
+                {
+                    "box": [
+                        1274,
+                        1349,
+                        1330,
+                        1374
+                    ],
+                    "text": "3.95"
+                }
+            ],
+            "linking": [],
+            "id": 36
+        },
+        {
+            "box": [
+                172,
+                1396,
+                634,
+                1421
+            ],
+            "text": "Segunda Lengua Extranjera: Franc\u00e9s",
+            "label": "frances_3_de_la_eso",
+            "words": [
+                {
+                    "box": [
+                        172,
+                        1396,
+                        289,
+                        1421
+                    ],
+                    "text": "Segunda"
+                },
+                {
+                    "box": [
+                        289,
+                        1396,
+                        389,
+                        1421
+                    ],
+                    "text": "Lengua"
+                },
+                {
+                    "box": [
+                        389,
+                        1396,
+                        537,
+                        1421
+                    ],
+                    "text": "Extranjera:"
+                },
+                {
+                    "box": [
+                        537,
+                        1396,
+                        634,
+                        1421
+                    ],
+                    "text": "Franc\u00e9s"
+                }
+            ],
+            "linking": [],
+            "id": 37
+        },
+        {
+            "box": [
+                1105,
+                1396,
+                1330,
+                1421
+            ],
+            "text": "Insuficiente - 4.28",
+            "label": "frances_3_de_la_eso_answer",
+            "words": [
+                {
+                    "box": [
+                        1105,
+                        1396,
+                        1258,
+                        1421
+                    ],
+                    "text": "Insuficiente"
+                },
+                {
+                    "box": [
+                        1258,
+                        1396,
+                        1274,
+                        1421
+                    ],
+                    "text": "-"
+                },
+                {
+                    "box": [
+                        1274,
+                        1396,
+                        1330,
+                        1421
+                    ],
+                    "text": "4.28"
+                }
+            ],
+            "linking": [],
+            "id": 38
+        },
+        {
+            "box": [
+                172,
+                1443,
+                264,
+                1468
+            ],
+            "text": "Lengua",
+            "label": "lengua_castellana_3_de_la_eso",
+            "words": [
+                {
+                    "box": [
+                        172,
+                        1443,
+                        264,
+                        1468
+                    ],
+                    "text": "Lengua"
+                }
+            ],
+            "linking": [],
+            "id": 39
+        },
+        {
+            "box": [
+                1113,
+                1443,
+                1319,
+                1468
+            ],
+            "text": "Suficiente - 5.63",
+            "label": "lengua_castellana_3_de_la_eso_answer",
+            "words": [
+                {
+                    "box": [
+                        1113,
+                        1443,
+                        1247,
+                        1468
+                    ],
+                    "text": "Suficiente"
+                },
+                {
+                    "box": [
+                        1247,
+                        1443,
+                        1263,
+                        1468
+                    ],
+                    "text": "-"
+                },
+                {
+                    "box": [
+                        1263,
+                        1443,
+                        1319,
+                        1468
+                    ],
+                    "text": "5.63"
+                }
+            ],
+            "linking": [],
+            "id": 40
+        },
+        {
+            "box": [
+                172,
+                1491,
+                233,
+                1516
+            ],
+            "text": "Lat\u00edn",
+            "label": "latin_3_de_la_eso",
+            "words": [
+                {
+                    "box": [
+                        172,
+                        1491,
+                        233,
+                        1516
+                    ],
+                    "text": "Lat\u00edn"
+                }
+            ],
+            "linking": [],
+            "id": 41
+        },
+        {
+            "box": [
+                1105,
+                1491,
+                1330,
+                1516
+            ],
+            "text": "Insuficiente - 3.52",
+            "label": "latin_3_de_la_eso_answer",
+            "words": [
+                {
+                    "box": [
+                        1105,
+                        1491,
+                        1258,
+                        1516
+                    ],
+                    "text": "Insuficiente"
+                },
+                {
+                    "box": [
+                        1258,
+                        1491,
+                        1274,
+                        1516
+                    ],
+                    "text": "-"
+                },
+                {
+                    "box": [
+                        1274,
+                        1491,
+                        1330,
+                        1516
+                    ],
+                    "text": "3.52"
+                }
+            ],
+            "linking": [],
+            "id": 42
+        },
+        {
+            "box": [
+                172,
+                1538,
+                389,
+                1563
+            ],
+            "text": "Historia Espa\u00f1ola",
+            "label": "historia_3_de_la_eso",
+            "words": [
+                {
+                    "box": [
+                        172,
+                        1538,
+                        275,
+                        1563
+                    ],
+                    "text": "Historia"
+                },
+                {
+                    "box": [
+                        275,
+                        1538,
+                        389,
+                        1563
+                    ],
+                    "text": "Espa\u00f1ola"
+                }
+            ],
+            "linking": [],
+            "id": 43
+        },
+        {
+            "box": [
+                1105,
+                1538,
+                1330,
+                1563
+            ],
+            "text": "Insuficiente - 4.22",
+            "label": "historia_3_de_la_eso_answer",
+            "words": [
+                {
+                    "box": [
+                        1105,
+                        1538,
+                        1258,
+                        1563
+                    ],
+                    "text": "Insuficiente"
+                },
+                {
+                    "box": [
+                        1258,
+                        1538,
+                        1274,
+                        1563
+                    ],
+                    "text": "-"
+                },
+                {
+                    "box": [
+                        1274,
+                        1538,
+                        1330,
+                        1563
+                    ],
+                    "text": "4.22"
+                }
+            ],
+            "linking": [],
+            "id": 44
+        },
+        {
+            "box": [
+                1163,
+                884,
+                1272,
+                917
+            ],
+            "text": "Notas",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        1163,
+                        884,
+                        1272,
+                        917
+                    ],
+                    "text": "Notas"
+                }
+            ],
+            "linking": [],
+            "id": 45
+        },
+        {
+            "box": [
+                155,
+                1864,
+                1450,
+                1897
+            ],
+            "text": "Y para que conste a los efectos oportunos, y a petici\u00f3n de el/la interesado/a,",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        155,
+                        1864,
+                        189,
+                        1897
+                    ],
+                    "text": "Y"
+                },
+                {
+                    "box": [
+                        189,
+                        1864,
+                        272,
+                        1897
+                    ],
+                    "text": "para"
+                },
+                {
+                    "box": [
+                        272,
+                        1864,
+                        347,
+                        1897
+                    ],
+                    "text": "que"
+                },
+                {
+                    "box": [
+                        347,
+                        1864,
+                        470,
+                        1897
+                    ],
+                    "text": "conste"
+                },
+                {
+                    "box": [
+                        470,
+                        1864,
+                        501,
+                        1897
+                    ],
+                    "text": "a"
+                },
+                {
+                    "box": [
+                        501,
+                        1864,
+                        559,
+                        1897
+                    ],
+                    "text": "los"
+                },
+                {
+                    "box": [
+                        559,
+                        1864,
+                        690,
+                        1897
+                    ],
+                    "text": "efectos"
+                },
+                {
+                    "box": [
+                        690,
+                        1864,
+                        882,
+                        1897
+                    ],
+                    "text": "oportunos,"
+                },
+                {
+                    "box": [
+                        882,
+                        1864,
+                        910,
+                        1897
+                    ],
+                    "text": "y"
+                },
+                {
+                    "box": [
+                        910,
+                        1864,
+                        943,
+                        1897
+                    ],
+                    "text": "a"
+                },
+                {
+                    "box": [
+                        943,
+                        1864,
+                        1085,
+                        1897
+                    ],
+                    "text": "petici\u00f3n"
+                },
+                {
+                    "box": [
+                        1085,
+                        1864,
+                        1138,
+                        1897
+                    ],
+                    "text": "de"
+                },
+                {
+                    "box": [
+                        1138,
+                        1864,
+                        1219,
+                        1897
+                    ],
+                    "text": "el/la"
+                },
+                {
+                    "box": [
+                        1219,
+                        1864,
+                        1450,
+                        1897
+                    ],
+                    "text": "interesado/a,"
+                }
+            ],
+            "linking": [],
+            "id": 46
+        },
+        {
+            "box": [
+                155,
+                1894,
+                679,
+                1928
+            ],
+            "text": "firmo al presente certificaci\u00f3n.",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        0,
+                        0,
+                        256,
+                        1928
+                    ],
+                    "text": "firmo"
+                },
+                {
+                    "box": [
+                        256,
+                        1894,
+                        295,
+                        1928
+                    ],
+                    "text": "al"
+                },
+                {
+                    "box": [
+                        295,
+                        1894,
+                        453,
+                        1928
+                    ],
+                    "text": "presente"
+                },
+                {
+                    "box": [
+                        453,
+                        1894,
+                        679,
+                        1928
+                    ],
+                    "text": "certificaci\u00f3n."
+                }
+            ],
+            "linking": [],
+            "id": 47
+        },
+        {
+            "box": [
+                155,
+                1966,
+                901,
+                2000
+            ],
+            "text": "Pozas de Alcorc\u00f3n, 12 de diciembre de 2022",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        155,
+                        1966,
+                        264,
+                        2000
+                    ],
+                    "text": "Pozas"
+                },
+                {
+                    "box": [
+                        264,
+                        1966,
+                        314,
+                        2000
+                    ],
+                    "text": "de"
+                },
+                {
+                    "box": [
+                        314,
+                        1966,
+                        481,
+                        2000
+                    ],
+                    "text": "Alcorc\u00f3n,"
+                },
+                {
+                    "box": [
+                        481,
+                        1966,
+                        534,
+                        2000
+                    ],
+                    "text": "12"
+                },
+                {
+                    "box": [
+                        534,
+                        1966,
+                        587,
+                        2000
+                    ],
+                    "text": "de"
+                },
+                {
+                    "box": [
+                        587,
+                        1966,
+                        762,
+                        2000
+                    ],
+                    "text": "diciembre"
+                },
+                {
+                    "box": [
+                        762,
+                        1966,
+                        815,
+                        2000
+                    ],
+                    "text": "de"
+                },
+                {
+                    "box": [
+                        815,
+                        1966,
+                        901,
+                        2000
+                    ],
+                    "text": "2022"
+                }
+            ],
+            "linking": [],
+            "id": 48
+        },
+        {
+            "box": [
+                473,
+                2036,
+                626,
+                2075
+            ],
+            "text": "Consejo",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        473,
+                        2036,
+                        626,
+                        2075
+                    ],
+                    "text": "Consejo"
+                }
+            ],
+            "linking": [],
+            "id": 49
+        },
+        {
+            "box": [
+                473,
+                2072,
+                645,
+                2111
+            ],
+            "text": "Brit\u00e1nico",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        473,
+                        2072,
+                        645,
+                        2111
+                    ],
+                    "text": "Brit\u00e1nico"
+                }
+            ],
+            "linking": [],
+            "id": 50
+        },
+        {
+            "box": [
+                473,
+                2108,
+                1263,
+                2136
+            ],
+            "text": "Delegaci\u00f3n en Espa\u00f1a de la Fundaci\u00f3n Consejo Brit\u00e1nico",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        473,
+                        2108,
+                        637,
+                        2136
+                    ],
+                    "text": "Delegaci\u00f3n"
+                },
+                {
+                    "box": [
+                        637,
+                        2108,
+                        681,
+                        2136
+                    ],
+                    "text": "en"
+                },
+                {
+                    "box": [
+                        681,
+                        2108,
+                        790,
+                        2136
+                    ],
+                    "text": "Espa\u00f1a"
+                },
+                {
+                    "box": [
+                        790,
+                        2108,
+                        835,
+                        2136
+                    ],
+                    "text": "de"
+                },
+                {
+                    "box": [
+                        835,
+                        2108,
+                        868,
+                        2136
+                    ],
+                    "text": "la"
+                },
+                {
+                    "box": [
+                        868,
+                        2108,
+                        1021,
+                        2136
+                    ],
+                    "text": "Fundaci\u00f3n"
+                },
+                {
+                    "box": [
+                        1021,
+                        2108,
+                        1138,
+                        2136
+                    ],
+                    "text": "Consejo"
+                },
+                {
+                    "box": [
+                        1138,
+                        2108,
+                        1263,
+                        2136
+                    ],
+                    "text": "Brit\u00e1nico"
+                }
+            ],
+            "linking": [],
+            "id": 51
+        },
+        {
+            "box": [
+                155,
+                2211,
+                768,
+                2245
+            ],
+            "text": "Responsable de la Direcci\u00f3n T\u00e9cnica",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        155,
+                        2211,
+                        381,
+                        2245
+                    ],
+                    "text": "Responsable"
+                },
+                {
+                    "box": [
+                        381,
+                        2211,
+                        431,
+                        2245
+                    ],
+                    "text": "de"
+                },
+                {
+                    "box": [
+                        431,
+                        2211,
+                        473,
+                        2245
+                    ],
+                    "text": "la"
+                },
+                {
+                    "box": [
+                        473,
+                        2211,
+                        640,
+                        2245
+                    ],
+                    "text": "Direcci\u00f3n"
+                },
+                {
+                    "box": [
+                        640,
+                        2211,
+                        768,
+                        2245
+                    ],
+                    "text": "T\u00e9cnica"
+                }
+            ],
+            "linking": [],
+            "id": 52
+        },
+        {
+            "box": [
+                155,
+                2245,
+                584,
+                2278
+            ],
+            "text": "Colegio Consejo Brit\u00e1nico",
+            "label": "other",
+            "words": [
+                {
+                    "box": [
+                        155,
+                        2245,
+                        292,
+                        2278
+                    ],
+                    "text": "Colegio"
+                },
+                {
+                    "box": [
+                        292,
+                        2245,
+                        434,
+                        2278
+                    ],
+                    "text": "Consejo"
+                },
+                {
+                    "box": [
+                        434,
+                        2245,
+                        584,
+                        2278
+                    ],
+                    "text": "Brit\u00e1nico"
+                }
+            ],
+            "linking": [],
+            "id": 53
+        }
+    ]
+}
