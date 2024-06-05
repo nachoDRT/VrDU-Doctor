@@ -23,6 +23,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the project
 COPY . .
 
+# For debugging purposes
+EXPOSE 5678
+
 # Execute the training
 RUN chmod +x src/start.sh
 CMD ["bash", "src/start.sh"]

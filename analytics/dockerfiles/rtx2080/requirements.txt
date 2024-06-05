@@ -5,3 +5,4 @@ wandb
 seqeval
 datasets
 sentencepiece
+debugpy
