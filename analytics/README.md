@@ -13,6 +13,10 @@ docker build -f dockerfiles/rtx2080/Dockerfile -t analysis .
 ```bash
 docker run -it --gpus '"device=0"' analysis
 ```
+### Debug the docker :no_entry_sign::bug:
+```bash
+docker run -p 5678:5678 -it --gpus '"device=0"' analysis
+```
 
 # Nvidia RTX3090
 Execute from ./VrDU-Doctor/analytics
