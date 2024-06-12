@@ -11,7 +11,7 @@ from transformers import LayoutLMv2ForTokenClassification
 TRANSPOSE = True
 
 
-def access_weights(model):
+def get_weights(model):
     weights_dict = {}
     for name, param in model.named_parameters():
         # msg = f"Layer: {name} | Size: {param.size()} | Values : {param[:2]} \n"
@@ -38,18 +38,41 @@ def write_csv(weights_data: list, headers: list) -> None:
     df.to_csv(csv_path, index=False)
 
 
+def get_chunk_multimodal(components: list) -> str:
+    """Given a chunk, determine if the weights are textual, visual or layout
+
+    Args:
+        components (list): the name of the chunk divided into tags
+
+    Returns:
+        str: "textual", "visual" or "layout"
+    """
+
+    # TODO refine the split condition. We could have "visual_segment" and won't be able to detect it right now
+    if "visual" in components:
+        multimodal = "visual"
+    elif "encoder" in components:
+        multimodal = "textual"
+    else:
+        multimodal = "N/A"
+
+    return multimodal
+
+
 def analyze_layer_names(layers_weights: dict) -> Tuple[int, dict]:
-    layer_names_dict = {}
+    chunks_names = {}
     max_layer_names_components = 0
 
     for key in layers_weights.keys():
         components = key.split(".")
-        layer_names_dict[key] = components
+        chunks_names[key] = {}
+        chunks_names[key]["components"] = components
+        chunks_names[key]["multimodal"] = get_chunk_multimodal(components)
         layer_names_components = len(components)
         if layer_names_components > max_layer_names_components:
             max_layer_names_components = layer_names_components
 
-    return max_layer_names_components, layer_names_dict
+    return max_layer_names_components, chunks_names
 
 
 def analyze_weights(layers_weights: dict) -> int:
@@ -69,9 +92,9 @@ def analyze_weights(layers_weights: dict) -> int:
     return max_layer_weights
 
 
-def compose_headers(n_names: int, n_weights: int, layers_names: dict) -> list:
+def compose_headers(n_names: int, n_weights: int, chunks_names: dict) -> list:
     if TRANSPOSE:
-        headers = [f"chunk_{i}" for i, _ in enumerate(layers_names)]
+        headers = [f"chunk_{i}" for i, _ in enumerate(chunks_names)]
     else:
         name_headers = [f"name_{n}" for n in range(n_names)]
         weights_headers = [f"weight_{n}" for n in range(n_weights)]
@@ -91,12 +114,12 @@ def flatten_weights(weights):
 
 
 def compose_data(
-    layers_weights: dict, layer_names_dict: dict, n_names: int, n_weights: int
-):
+    layers_weights: dict, chunks_names: dict, n_names: int, n_weights: int
+) -> list:
     data = []
 
     for layer_name, layer_weights in layers_weights.items():
-        row_data = layer_names_dict[layer_name]
+        row_data = chunks_names[layer_name]["components"]
         for _ in range(len(row_data), n_names):
             row_data.append("")
         for weight in layer_weights:
@@ -108,17 +131,60 @@ def compose_data(
     return data
 
 
-def format_weights_data(layers_weights: dict):
-    max_nested_names, layer_names_dict = analyze_layer_names(layers_weights)
+def format_weights_data(layers_weights: dict) -> Tuple[list, list, dict, dict]:
+    max_names_tags, chunks_names = analyze_layer_names(layers_weights)
     max_weights = analyze_weights(layers_weights)
 
-    headers = compose_headers(max_nested_names, max_weights, layer_names_dict)
-    data = compose_data(layers_weights, layer_names_dict, max_nested_names, max_weights)
+    # Gather data dimensions
+    data_dims = {}
+    data_dims["chunks_max_names_tags"] = max_names_tags
+    data_dims["chunks_max_weights"] = max_weights
 
-    return data, headers
+    headers = compose_headers(max_names_tags, max_weights, chunks_names)
+    data = compose_data(layers_weights, chunks_names, max_names_tags, max_weights)
+
+    return data, headers, chunks_names, data_dims
 
 
-def save_weights_data(weights_data: list, headers: list):
+def split_weights_data(
+    data: list, chunks_names: dict, data_dims: dict
+) -> Tuple[dict, dict, dict]:
+    """_summary_
+
+    Args:
+        data (list): a list of 'n' lists, being 'n' the number of chunks
+        chunks_names (dict): a dict with lists as values. Every list contains the tags
+            of the chunk
+        data_dims (dict): Data with the max dims of the data (max chunk-name tags, and
+            max weighst)
+
+    Returns:
+        Tuple[dict, dict, dict]: One dictionary per partition (visual, textual) + one to
+            gather those cases with no detected modal type (n_a)
+    """
+
+    t_w = {}
+    v_w = {}
+    n_a_w = {}
+
+    max_names_tags = data_dims["chunks_max_names_tags"]
+    # max_weights = data_dims["chunks_max_weights"]
+
+    for i, (chunk_key, chunk_value) in enumerate(chunks_names.items()):
+        weights = [
+            weight for weight in data[i][max_names_tags:] if type(weight) == float
+        ]
+        if chunk_value["multimodal"] == "visual":
+            v_w[chunk_key] = weights
+        elif chunk_value["multimodal"] == "textual":
+            t_w[chunk_key] = weights
+        else:
+            n_a_w[chunk_key] = weights
+
+    return t_w, v_w, n_a_w
+
+
+def save_data(weights_data: list, headers: list):
     write_csv(weights_data, headers)
 
 
@@ -140,6 +206,17 @@ if __name__ == "__main__":
     model = LayoutLMv2ForTokenClassification.from_pretrained(model_path)
 
     # Access model weights
-    weights_dict = access_weights(model)
-    data, headers = format_weights_data(weights_dict)
-    save_weights_data(data, headers)
+    weights_dict = get_weights(model)
+    data, headers, chunks_names, data_dims = format_weights_data(weights_dict)
+
+    # Split data
+    t_w, v_w, n_a_w = split_weights_data(data, chunks_names, data_dims)
+
+    # Pre visualize data
+    # TODO
+
+    # Process data
+    # TODO
+
+    # Save data
+    save_data(data, headers)
