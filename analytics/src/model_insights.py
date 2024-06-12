@@ -4,17 +4,18 @@ import debugpy
 import pandas as pd
 import numpy as np
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, List
 from transformers import LayoutLMv2ForTokenClassification
+from previsualize import previsualize
 
 
 TRANSPOSE = True
+PREVISUALIZE = True
 
 
 def get_weights(model):
     weights_dict = {}
     for name, param in model.named_parameters():
-        # msg = f"Layer: {name} | Size: {param.size()} | Values : {param[:2]} \n"
         weights_tensor = param[:2]
         weights_tensor_list = weights_tensor.tolist()
         weights_dict[name] = weights_tensor_list
@@ -22,7 +23,7 @@ def get_weights(model):
     return weights_dict
 
 
-def write_csv(weights_data: list, headers: list) -> None:
+def write_csv(weights_data: List, headers: List) -> None:
     """
     Write the weights dictionary to a CSV file.
 
@@ -38,17 +39,18 @@ def write_csv(weights_data: list, headers: list) -> None:
     df.to_csv(csv_path, index=False)
 
 
-def get_chunk_multimodal(components: list) -> str:
+def get_chunk_multimodal(components: List) -> str:
     """Given a chunk, determine if the weights are textual, visual or layout
 
     Args:
-        components (list): the name of the chunk divided into tags
+        components (List): the name of the chunk divided into tags
 
     Returns:
         str: "textual", "visual" or "layout"
     """
 
-    # TODO refine the split condition. We could have "visual_segment" and won't be able to detect it right now
+    # TODO refine the split condition. We could have "visual_segment" and won't be able
+    # to detect it right now
     if "visual" in components:
         multimodal = "visual"
     elif "encoder" in components:
@@ -92,7 +94,7 @@ def analyze_weights(layers_weights: dict) -> int:
     return max_layer_weights
 
 
-def compose_headers(n_names: int, n_weights: int, chunks_names: dict) -> list:
+def compose_headers(n_names: int, n_weights: int, chunks_names: dict) -> List:
     if TRANSPOSE:
         headers = [f"chunk_{i}" for i, _ in enumerate(chunks_names)]
     else:
@@ -115,7 +117,7 @@ def flatten_weights(weights):
 
 def compose_data(
     layers_weights: dict, chunks_names: dict, n_names: int, n_weights: int
-) -> list:
+) -> List:
     data = []
 
     for layer_name, layer_weights in layers_weights.items():
@@ -131,7 +133,7 @@ def compose_data(
     return data
 
 
-def format_weights_data(layers_weights: dict) -> Tuple[list, list, dict, dict]:
+def format_weights_data(layers_weights: dict) -> Tuple[List, List, dict, dict]:
     max_names_tags, chunks_names = analyze_layer_names(layers_weights)
     max_weights = analyze_weights(layers_weights)
 
@@ -147,12 +149,12 @@ def format_weights_data(layers_weights: dict) -> Tuple[list, list, dict, dict]:
 
 
 def split_weights_data(
-    data: list, chunks_names: dict, data_dims: dict
+    data: List, chunks_names: dict, data_dims: dict
 ) -> Tuple[dict, dict, dict]:
     """_summary_
 
     Args:
-        data (list): a list of 'n' lists, being 'n' the number of chunks
+        data (List): a list of 'n' lists, being 'n' the number of chunks
         chunks_names (dict): a dict with lists as values. Every list contains the tags
             of the chunk
         data_dims (dict): Data with the max dims of the data (max chunk-name tags, and
@@ -166,6 +168,10 @@ def split_weights_data(
     t_w = {}
     v_w = {}
     n_a_w = {}
+
+    t_w["name"] = "textual"
+    v_w["name"] = "visual"
+    n_a_w["name"] = "N/A"
 
     max_names_tags = data_dims["chunks_max_names_tags"]
     # max_weights = data_dims["chunks_max_weights"]
@@ -184,7 +190,7 @@ def split_weights_data(
     return t_w, v_w, n_a_w
 
 
-def save_data(weights_data: list, headers: list):
+def save_data(weights_data: List, headers: List):
     write_csv(weights_data, headers)
 
 
@@ -210,10 +216,11 @@ if __name__ == "__main__":
     data, headers, chunks_names, data_dims = format_weights_data(weights_dict)
 
     # Split data
-    t_w, v_w, n_a_w = split_weights_data(data, chunks_names, data_dims)
+    data_splits = split_weights_data(data, chunks_names, data_dims)
 
     # Pre visualize data
-    # TODO
+    if PREVISUALIZE:
+        previsualize(data_splits)
 
     # Process data
     # TODO
