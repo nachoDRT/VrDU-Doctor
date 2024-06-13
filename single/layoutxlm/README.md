@@ -32,3 +32,9 @@ docker build -f dockerfiles/rtx4090/Dockerfile -t layoutxlm .
 ```bash
 docker run -it --gpus '"device=0"' -v /host_path_to_save_models:/app/models_output layoutxlm
 ```
+
+# Remove *models* protected folder
+Execute from ./VrDU-Doctor/single/layoutlxlm
+```bash
+sudo rm -rf models
+```

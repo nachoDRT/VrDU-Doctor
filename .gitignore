@@ -5,6 +5,7 @@ bruteforce/layoutxlm/data
 single/layoutxlm/config/huggingface_logging.json
 single/layoutxlm/config/wandb_logging.json
 single/layoutxlm/data
+single/layoutxlm/models
 
 postprocess/models/*/
 !postprocess/models/*.*

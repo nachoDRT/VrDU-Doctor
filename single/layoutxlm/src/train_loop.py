@@ -158,26 +158,6 @@ class DataCollatorForTokenClassification:
         return batch
 
 
-class CustomCheckpointCallback(TrainerCallback):
-    def __init__(self, training_session_name):
-        self.training_session_name = training_session_name
-
-    def on_save(self, args, state, control, **kwargs):
-        custom_checkpoint_name = (
-            f"checkpoint_step_{state.global_step}_session_{self.training_session_name}"
-        )
-        custom_checkpoint_path = os.path.join(args.output_dir, custom_checkpoint_name)
-
-        if os.path.exists(custom_checkpoint_path):
-            shutil.rmtree(custom_checkpoint_path)
-
-        latest_checkpoint_path = os.path.join(
-            args.output_dir, f"checkpoint-{state.global_step}"
-        )
-        if os.path.exists(latest_checkpoint_path):
-            os.rename(latest_checkpoint_path, custom_checkpoint_path)
-
-
 if __name__ == "__main__":
     torch.cuda.empty_cache()
 
@@ -246,12 +226,10 @@ if __name__ == "__main__":
             output_dir="/app/models_output",
             max_steps=MAX_TRAIN_STEPS,
             learning_rate=2.5e-5,
-            # warmup_ratio=0.1,
             fp16=True,
             per_device_train_batch_size=2,
             per_device_eval_batch_size=2,
             push_to_hub=False,
-            # push_to_hub_model_id="CICLAB-Comillas/layoutlmv2-LSD",
             remove_unused_columns=False,
             logging_strategy="steps",
             logging_steps=LOGGING_STEPS,
@@ -260,7 +238,6 @@ if __name__ == "__main__":
             report_to="wandb",
             load_best_model_at_end=True,
             save_total_limit=1,
-            save_steps=EVAL_FRECUENCY,
         )
 
         # Initialize our Trainer
@@ -272,11 +249,15 @@ if __name__ == "__main__":
             tokenizer=tokenizer,
             data_collator=data_collator,
             compute_metrics=compute_metrics,
-            callbacks=[CustomCheckpointCallback(training_session_name)],
         )
 
         # Train
         trainer.train()
+        # Save best iteration model
+        best_checkpoint_dir = (
+            f"/app/models_output/{training_session_name}/iteration_{i}"
+        )
+        trainer.save_model(best_checkpoint_dir)
 
         # Test
         test_results = trainer.predict(test_dataset)
