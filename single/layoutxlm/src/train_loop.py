@@ -29,10 +29,10 @@ WANDB_LOGGING_PATH = "/app/config/wandb_logging.json"
 HUGGINGFACE_LOGGING_PATH = "/app/config/huggingface_logging.json"
 DATASET_FOLDER = "/app/data/train-val/spanish/"
 
-MAX_TRAIN_STEPS = 100
-EVAL_FRECUENCY = 25
+MAX_TRAIN_STEPS = 5000
+EVAL_FRECUENCY = 500
 LOGGING_STEPS = 1
-CONSISTENCY = 2
+CONSISTENCY = 20
 
 
 def get_dataset_name() -> str:
@@ -260,7 +260,7 @@ if __name__ == "__main__":
             report_to="wandb",
             load_best_model_at_end=True,
             save_total_limit=1,
-            save_steps=50,
+            save_steps=EVAL_FRECUENCY,
         )
 
         # Initialize our Trainer
