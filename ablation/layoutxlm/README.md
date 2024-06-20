@@ -1,5 +1,5 @@
 # Nvidia RTX2080
-Execute from ./VrDU-Doctor/single/layoutlxlm
+Execute from ./VrDU-Doctor
 ### Create the docker :whale:
 ```bash
 docker build -f dockerfiles/rtx2080/Dockerfile -t layoutxlm .
@@ -10,7 +10,7 @@ docker run -it --gpus '"device=0"' -v /host_path_to_save_models:/app/models_outp
 ```
 
 # Nvidia RTX3090
-Execute from ./VrDU-Doctor/single/layoutlxlm
+Execute from ./VrDU-Doctor
 ### Create the docker :whale:
 ```bash
 docker build -f dockerfiles/rtx3090/Dockerfile -t layoutxlm .
@@ -22,7 +22,7 @@ docker run -it --gpus '"device=0"' -v /host_path_to_save_models:/app/models_outp
 
 
 # Nvidia RTX4090
-Execute from ./VrDU-Doctor/single/layoutlxlm
+Execute from ./VrDU-Doctor
 ### Create the docker :whale:
 ```bash
 docker build -f dockerfiles/rtx4090/Dockerfile -t layoutxlm .

@@ -1,3 +1,6 @@
+ablation/layoutxlm/config/wandb_logging.json
+ablation/layoutxlm/data/
+
 bruteforce/layoutxlm/config/huggingface_logging.json
 bruteforce/layoutxlm/config/wandb_logging.json
 bruteforce/layoutxlm/data
