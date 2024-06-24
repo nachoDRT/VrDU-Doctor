@@ -3,7 +3,6 @@ import numpy as np
 import json
 import wandb
 import os
-import shutil
 import argparse
 from typing import Optional, Union
 from datasets import load_metric, load_dataset
@@ -18,6 +17,7 @@ from transformers import (
     TrainingArguments,
     Trainer,
     TrainerCallback,
+    LayoutLMv2Config,
 )
 
 from transformers.file_utils import PaddingStrategy
@@ -213,9 +213,19 @@ if __name__ == "__main__":
             entity=wandb_config["entity"],
             name="".join([training_session_name, "_", str(i)]),
         )
+        ablation_config = {"text": False, "layout": False, "vision": True}
+        pretrained_model = "microsoft/layoutxlm-base"
+
+        custom_config = LayoutLMv2Config.from_pretrained(
+            pretrained_model_name_or_path=pretrained_model,
+            ablation_config=ablation_config,
+            id2label=id2label,
+            label2id=label2id,
+        )
 
         model = LayoutLMv2ForTokenClassification.from_pretrained(
-            "microsoft/layoutxlm-base", id2label=id2label, label2id=label2id
+            pretrained_model_name_or_path=pretrained_model,
+            config=custom_config,
         )
 
         # Metrics
