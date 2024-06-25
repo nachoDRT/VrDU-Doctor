@@ -4,6 +4,7 @@ import json
 import wandb
 import os
 import argparse
+import debugpy
 from typing import Optional, Union
 from datasets import load_metric, load_dataset
 
@@ -164,7 +165,14 @@ if __name__ == "__main__":
     # Define parsing values
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset_name", type=str, default=False)
+    parser.add_argument("--debug", type=str)
     args = parser.parse_args()
+
+    # Debug
+    if eval(args.debug):
+        debugpy.listen(("0.0.0.0", 5678))
+        print("Waiting for debugger to connect...")
+        debugpy.wait_for_client()
 
     # Logging in wandb
     with open(WANDB_LOGGING_PATH) as f:

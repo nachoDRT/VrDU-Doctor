@@ -27,6 +27,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the project
 COPY ablation/layoutxlm/ /app
 
+# For debugging purposes
+EXPOSE 5678
+
 # Execute the training
 RUN chmod +x /app/src/start.sh
 CMD ["bash", "/app/src/start.sh"]

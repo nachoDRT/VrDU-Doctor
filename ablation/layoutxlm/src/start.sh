@@ -6,4 +6,5 @@ python src/format_dataset.py \
     --gather_train_val_data_from "app/data/train-val/" \
     --gather_test_data_from "app/data/test/"
 # find . -maxdepth 3 | sed -e 's;[^/]*/;|____;g;s;____|; |;g'
-python src/train_loop.py
+python src/train_loop.py \
+    --debug True

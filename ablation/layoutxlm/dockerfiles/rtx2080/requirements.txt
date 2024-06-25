@@ -5,3 +5,4 @@ seqeval
 datasets==2.19.2
 sentencepiece
 tokenizers==0.13.0
+debugpy
