@@ -13,6 +13,10 @@
                 {
                     "localRoot": "${workspaceFolder}",
                     "remoteRoot": "/app/src"
+                },
+                {
+                    "localRoot": "/your_local_path_to_project/VrDU-Doctor/transformers/src/transformers/models/layoutlmv2",
+                    "remoteRoot": "/app/transformers/src/transformers/models/layoutlmv2"
                 }
             ]
         }
