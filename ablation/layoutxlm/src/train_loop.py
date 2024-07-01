@@ -222,11 +222,13 @@ if __name__ == "__main__":
             name="".join([training_session_name, "_", str(i)]),
         )
         ablation_config = {"text": False, "layout": False, "vision": True}
+        custom_weights_init = {"zeros": True}
         pretrained_model = "microsoft/layoutxlm-base"
 
         custom_config = LayoutLMv2Config.from_pretrained(
             pretrained_model_name_or_path=pretrained_model,
             ablation_config=ablation_config,
+            custom_weights_init=custom_weights_init,
             id2label=id2label,
             label2id=label2id,
         )
