@@ -13,3 +13,5 @@ single/layoutxlm/models
 
 postprocess/models/*/
 !postprocess/models/*.*
+
+ablation/layoutxlm/models/
