@@ -1,1 +1,7 @@
 debugpy
+transformers
+datasets
+sentencepiece
+pytorch-lightning
+wandb
+nltk
