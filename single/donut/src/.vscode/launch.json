@@ -13,6 +13,10 @@
                 {
                     "localRoot": "${workspaceFolder}",
                     "remoteRoot": "/app/src"
+                },
+                {
+                    "localRoot": "${workspaceFolder}",
+                    "remoteRoot": "/app/src/utils"
                 }
             ]
         }
