@@ -10,8 +10,7 @@ single/layoutxlm/config/huggingface_logging.json
 single/layoutxlm/config/wandb_logging.json
 single/layoutxlm/data
 single/layoutxlm/models
+single/donut/dataset_inspection
 
 postprocess/models/*/
 !postprocess/models/*.*
-
-ablation/layoutxlm/models/
