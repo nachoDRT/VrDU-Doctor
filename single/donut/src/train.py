@@ -118,6 +118,7 @@ class DonutDataset(Dataset):
     def __init__(
         self,
         dataset_name_or_path: str,
+        subset: str,
         max_length: int,
         split: str = "train",
         ignore_id: int = -100,
@@ -136,7 +137,7 @@ class DonutDataset(Dataset):
         )
         self.sort_json_key = sort_json_key
 
-        self.dataset = load_dataset(dataset_name_or_path, split=self.split)
+        self.dataset = load_dataset(dataset_name_or_path, name=subset, split=self.split)
         self.dataset_length = len(self.dataset)
 
         self.gt_token_sequences = []
@@ -278,9 +279,6 @@ if __name__ == "__main__":
         print("Waiting for debugger to connect...")
         debugpy.wait_for_client()
 
-    # Import dataset
-    dataset = load_dataset("naver-clova-ix/cord-v2")
-
     # Load model and processor
     image_size = [1280, 960]
     max_length = 768
@@ -299,7 +297,8 @@ if __name__ == "__main__":
     processor.image_processor.do_align_long_axis = False
 
     train_dataset = DonutDataset(
-        "naver-clova-ix/cord-v2",
+        "de-Rodrigo/merit",
+        subset="en-digital-seq",
         max_length=max_length,
         split="train",
         task_start_token="<s_cord-v2>",
@@ -308,7 +307,8 @@ if __name__ == "__main__":
     )
 
     val_dataset = DonutDataset(
-        "naver-clova-ix/cord-v2",
+        "de-Rodrigo/merit",
+        subset="en-digital-seq",
         max_length=max_length,
         split="validation",
         task_start_token="<s_cord-v2>",
