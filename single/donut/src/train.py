@@ -16,7 +16,7 @@ from typing import Any, List, Tuple
 from torch.utils.data import DataLoader
 from nltk import edit_distance
 from torch.utils.data import Dataset
-from pytorch_lightning.callbacks import EarlyStopping
+from pytorch_lightning.callbacks import EarlyStopping, Callback
 from pytorch_lightning.loggers import WandbLogger
 
 
@@ -266,6 +266,19 @@ class DonutDataset(Dataset):
         return pixel_values, labels, target_sequence
 
 
+class PushToHubCallback(Callback):
+    def on_train_epoch_end(self, trainer, pl_module):
+        print(f"Pushing model to the hub, epoch {trainer.current_epoch}")
+        pl_module.model.push_to_hub("de-Rodrigo/donut-merit",
+            commit_message=f"Training in progress, epoch {trainer.current_epoch}")
+
+    def on_train_end(self, trainer, pl_module):
+        print(f"Pushing model to the hub after training")
+        pl_module.processor.push_to_hub("de-Rodrigo/donut-merit",
+            commit_message=f"Training done")
+        pl_module.model.push_to_hub("de-Rodrigo/donut-merit",
+            commit_message=f"Training done")
+
 if __name__ == "__main__":
 
     # Define parsing values
@@ -293,7 +306,7 @@ if __name__ == "__main__":
     )
 
     # Dataset instances
-    processor.image_processor.size = image_size[::-1]  # should be (width, height)
+    processor.image_processor.size = image_size[::-1]
     processor.image_processor.do_align_long_axis = False
 
     train_dataset = DonutDataset(
@@ -303,7 +316,7 @@ if __name__ == "__main__":
         split="train",
         task_start_token="<s_cord-v2>",
         prompt_end_token="<s_cord-v2>",
-        sort_json_key=False,  # cord dataset is preprocessed, so no need for this
+        sort_json_key=False,
     )
 
     val_dataset = DonutDataset(
@@ -313,7 +326,7 @@ if __name__ == "__main__":
         split="validation",
         task_start_token="<s_cord-v2>",
         prompt_end_token="<s_cord-v2>",
-        sort_json_key=False,  # cord dataset is preprocessed, so no need for this
+        sort_json_key=False,
     )
 
     model.config.pad_token_id = processor.tokenizer.pad_token_id
@@ -329,17 +342,16 @@ if __name__ == "__main__":
 
     # Train
     config = {
-        "max_epochs": 30,
-        "val_check_interval": 0.2,  # how many times we want to validate during an epoch
+        "max_steps": 1000,
+        "val_check_interval": 0.2,
         "check_val_every_n_epoch": 1,
         "gradient_clip_val": 1.0,
         "num_training_samples_per_epoch": 800,
         "lr": 3e-5,
         "train_batch_sizes": [8],
         "val_batch_sizes": [1],
-        # "seed":2022,
         "num_nodes": 1,
-        "warmup_steps": 300,  # 800/8*30/10, 10%
+        "warmup_steps": 300,
         "result_path": "./result",
         "verbose": True,
     }
@@ -358,7 +370,7 @@ if __name__ == "__main__":
         val_check_interval=config.get("val_check_interval"),
         check_val_every_n_epoch=config.get("check_val_every_n_epoch"),
         gradient_clip_val=config.get("gradient_clip_val"),
-        precision=16,  # we'll use mixed precision
+        precision=16,
         num_sanity_val_steps=0,
         logger=wandb_logger,
         callbacks=[early_stop_callback],
