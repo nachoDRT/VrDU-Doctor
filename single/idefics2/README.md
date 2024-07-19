@@ -10,7 +10,7 @@ docker build -f dockerfiles/your_card/Dockerfile -t idefics2 .
 
 ### Run :boom: or Debug :no_entry_sign::bug: the docker
 ```bash
-docker run -p 5678:5678 -it --gpus all -v /host_path_to_save_models:/app/models_output idefics2
+docker run -p 5678:5678 -it --gpus all -v /host_path_to_save_models:/app/models_output idefics2 2>&1 | tee log.txt
 ```
 
 ### Inspect default dataset using a volume
