@@ -43,7 +43,10 @@ class Idefics2Dataset(Dataset):
 
     def __init__(
         self,
+        processor,
+        model,
         dataset_name_or_path: str,
+        subset: str,
         split: str = "train",
         sort_json_key: bool = True,
     ):
@@ -52,7 +55,10 @@ class Idefics2Dataset(Dataset):
         self.split = split
         self.sort_json_key = sort_json_key
 
-        self.dataset = load_dataset(dataset_name_or_path, split=self.split)
+        self.processor = processor
+        self.model = model
+
+        self.dataset = load_dataset(dataset_name_or_path, name=subset, split=self.split)
         self.dataset_length = len(self.dataset)
 
         self.gt_token_sequences = []
@@ -113,9 +119,9 @@ class Idefics2Dataset(Dataset):
         """
         Add special tokens to tokenizer and resize the token embeddings of the decoder
         """
-        newly_added_num = processor.tokenizer.add_tokens(list_of_tokens)
+        newly_added_num = self.rocessor.tokenizer.add_tokens(list_of_tokens)
         if newly_added_num > 0:
-            model.resize_token_embeddings(len(processor.tokenizer))
+            self.model.resize_token_embeddings(len(self.processor.tokenizer))
             self.added_tokens.extend(list_of_tokens)
 
     def __len__(self) -> int:
@@ -167,7 +173,7 @@ class Idefics2ModelPLModule(L.LightningModule):
         input_ids, attention_mask, pixel_values, pixel_attention_mask, answers = batch
 
         # autoregressively generate token IDs
-        generated_ids = model.generate(input_ids=input_ids, attention_mask=attention_mask,
+        generated_ids = self.model.generate(input_ids=input_ids, attention_mask=attention_mask,
             pixel_values=pixel_values, pixel_attention_mask=pixel_attention_mask,
             max_new_tokens=768)
         # turn them back into text, chopping of the prompt
@@ -195,10 +201,10 @@ class Idefics2ModelPLModule(L.LightningModule):
         return optimizer
 
     def train_dataloader(self):
-        return DataLoader(train_dataset, collate_fn=train_collate_fn, batch_size=self.batch_size, shuffle=True, num_workers=4)
+        return DataLoader(train_dataset, collate_fn=train_collate_fn(self.processor, self.model), batch_size=self.batch_size, shuffle=True, num_workers=4)
 
     def val_dataloader(self):
-        return DataLoader(val_dataset, collate_fn=eval_collate_fn, batch_size=self.batch_size, shuffle=False, num_workers=4)
+        return DataLoader(val_dataset, collate_fn=eval_collate_fn(self.processor, self.model), batch_size=self.batch_size, shuffle=False, num_workers=4)
 
 
 class PushToHubCallback(Callback):
@@ -272,7 +278,7 @@ def apply_peft():
     return peft_model
 
 
-def train_collate_fn(examples):
+def train_collate_fn(examples, processor, model):
     texts = []
     images = []
     for example in examples:
@@ -312,7 +318,7 @@ def train_collate_fn(examples):
     return input_ids, attention_mask, pixel_values, pixel_attention_mask, labels
 
 
-def eval_collate_fn(examples):
+def eval_collate_fn(examples, processor, model):
     images = []
     texts = []
     answers = []
@@ -342,8 +348,8 @@ def eval_collate_fn(examples):
     return input_ids, attention_mask, pixel_values, pixel_attention_mask, answers
 
 
-def init_pl_module():
-    config = {"max_epochs": 10,
+def init_pl_module(processor, model):
+    configuration = {"max_epochs": 10,
         "val_check_interval": 1.0,
         "check_val_every_n_epoch": 1,
         "gradient_clip_val": 1.0,
@@ -357,30 +363,30 @@ def init_pl_module():
         "verbose": True,
     }
 
-    model_module = Idefics2ModelPLModule(config, processor, model)
+    model_module = Idefics2ModelPLModule(configuration, processor, model)
 
-    return model_module, config
+    return model_module, configuration
 
 
-def train_idefics2():
+def train_idefics2(idefics2, configuration):
     login(token=os.getenv("HUGGINGFACE_HUB_TOKEN"))
     wandb.login(key=os.getenv("WANDB_API_KEY"))
-    wandb_logger = WandbLogger(project="Idefics2-PL", name="demo-run-cord")
+    wandb_logger = WandbLogger(project="Idefics2", name="merit")
 
     trainer = L.Trainer(
             accelerator="gpu",
             devices="auto", # Use available GPUs
-            max_epochs=config.get("max_epochs"),
-            check_val_every_n_epoch=config.get("check_val_every_n_epoch"),
-            gradient_clip_val=config.get("gradient_clip_val"),
-            accumulate_grad_batches=config.get("accumulate_grad_batches"),
-            precision=config.get("precision"),
+            max_epochs=configuration.get("max_epochs"),
+            check_val_every_n_epoch=configuration.get("check_val_every_n_epoch"),
+            gradient_clip_val=configuration.get("gradient_clip_val"),
+            accumulate_grad_batches=configuration.get("accumulate_grad_batches"),
+            precision=configuration.get("precision"),
             num_sanity_val_steps=0,
             logger=wandb_logger,
             callbacks=[PushToHubCallback(), early_stop_callback],
     )
 
-    trainer.fit(model_module)
+    trainer.fit(idefics2)
 
 
 if __name__ == "__main__":
@@ -399,10 +405,10 @@ if __name__ == "__main__":
         debugpy.wait_for_client()
 
     # Load Processor
-    processor = AutoProcessor.from_pretrained("HuggingFaceM4/idefics2-8b", do_image_splitting=False)
+    idefics2_processor = AutoProcessor.from_pretrained("HuggingFaceM4/idefics2-8b", do_image_splitting=False)
 
     # Load Model
-    model = load_model()
+    idefics2 = load_model()
 
     # Load dataset partitions
     train_dataset = Idefics2Dataset(args.dataset, subset=args.subset, split="train", sort_json_key=False)
@@ -410,17 +416,17 @@ if __name__ == "__main__":
     
     # Apply Parameter-Efficient Fine-Tuning (PEFT)
     if not USE_ADD_ADAPTER:
-        model = apply_peft()
+        idefics2 = apply_peft()
 
     # Collate Function
-    image_token_id = processor.tokenizer.additional_special_tokens_ids[processor.tokenizer.additional_special_tokens.index("<image>")]
+    image_token_id = idefics2_processor.tokenizer.additional_special_tokens_ids[idefics2_processor.tokenizer.additional_special_tokens.index("<image>")]
 
     # Callback
     early_stop_callback = EarlyStopping(monitor="val_edit_distance", patience=2, verbose=False, mode="min")
 
     # Pytorch Lightning module
-    model_module, config = init_pl_module()
+    idefics2_module, config = init_pl_module(idefics2_processor, idefics2)
     
     # Train
-    train_idefics2(model_module, config)
+    train_idefics2(idefics2_module, config)
     
