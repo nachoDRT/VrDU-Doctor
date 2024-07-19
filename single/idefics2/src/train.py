@@ -393,9 +393,9 @@ if __name__ == "__main__":
 
     # Define parsing values
     parser = argparse.ArgumentParser()
-    parser.add_argument("--debug", type=str)
-    parser.add_argument("--dataset", type=str)
-    parser.add_argument("--subset", type=str)
+    parser.add_argument("--debug", required=True, type=str)
+    parser.add_argument("--dataset", required=True, type=str)
+    parser.add_argument("--subset", default=None, type=str)
     args = parser.parse_args()
 
     # Debug
