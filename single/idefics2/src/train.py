@@ -119,7 +119,7 @@ class Idefics2Dataset(Dataset):
         """
         Add special tokens to tokenizer and resize the token embeddings of the decoder
         """
-        newly_added_num = self.rocessor.tokenizer.add_tokens(list_of_tokens)
+        newly_added_num = self.processor.tokenizer.add_tokens(list_of_tokens)
         if newly_added_num > 0:
             self.model.resize_token_embeddings(len(self.processor.tokenizer))
             self.added_tokens.extend(list_of_tokens)
@@ -201,10 +201,10 @@ class Idefics2ModelPLModule(L.LightningModule):
         return optimizer
 
     def train_dataloader(self):
-        return DataLoader(train_dataset, collate_fn=train_collate_fn(self.processor, self.model), batch_size=self.batch_size, shuffle=True, num_workers=4)
+        return DataLoader(train_dataset, collate_fn=lambda examples: train_collate_fn(examples, self.processor, self.model), batch_size=self.batch_size, shuffle=True, num_workers=4)
 
     def val_dataloader(self):
-        return DataLoader(val_dataset, collate_fn=eval_collate_fn(self.processor, self.model), batch_size=self.batch_size, shuffle=False, num_workers=4)
+        return DataLoader(val_dataset, collate_fn=lambda examples: eval_collate_fn(examples, self.processor, self.model), batch_size=self.batch_size, shuffle=False, num_workers=4)
 
 
 class PushToHubCallback(Callback):
@@ -411,8 +411,8 @@ if __name__ == "__main__":
     idefics2 = load_model()
 
     # Load dataset partitions
-    train_dataset = Idefics2Dataset(args.dataset, subset=args.subset, split="train", sort_json_key=False)
-    val_dataset = Idefics2Dataset(args.dataset, subset=args.subset, split="validation", sort_json_key=False)
+    train_dataset = Idefics2Dataset(processor=idefics2_processor, model=idefics2, dataset_name_or_path=args.dataset, subset=args.subset, split="train", sort_json_key=False)
+    val_dataset = Idefics2Dataset(processor=idefics2_processor, model=idefics2, dataset_name_or_path=args.dataset, subset=args.subset, split="validation", sort_json_key=False)
     
     # Apply Parameter-Efficient Fine-Tuning (PEFT)
     if not USE_ADD_ADAPTER:
