@@ -1,0 +1,4 @@
+debugpy
+datasets
+wandb
+pillow
