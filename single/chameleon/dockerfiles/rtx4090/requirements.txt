@@ -2,3 +2,4 @@ debugpy
 datasets
 wandb
 pillow
+accelerate

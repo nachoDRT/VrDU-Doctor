@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 RUN pip install torch==1.8.0+cu111 torchvision==0.9.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
-RUN pip install -q detectron2 -f https://dl.fbaipublicfiles.com/detectron2/wheels/cu111/torch1.8/index.html
+RUN pip install git+https://github.com/huggingface/transformers
 
 # Copy and install requirements
 COPY dockerfiles/rtx3090/requirements.txt .
