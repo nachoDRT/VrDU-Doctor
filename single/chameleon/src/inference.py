@@ -93,10 +93,7 @@ def extract_grades(chameleon_model, chameleon_processor, dataset):
         if not isinstance(image, Image.Image):
             image = Image.fromarray(image)
 
-        inputs = chameleon_processor(prompt, image, return_tensors="pt").to(
-            model.device
-        )
-        inputs = {k: v.to(torch.float16) for k, v in inputs.items()}
+        inputs = processor(prompt, image, return_tensors="pt").to(model.device, torch.bfloat16)
 
         output = chameleon_model.generate(**inputs, max_new_tokens=1024)
         grades.append(output)
