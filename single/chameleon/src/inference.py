@@ -9,7 +9,7 @@ from transformers import ChameleonProcessor, ChameleonForConditionalGeneration
 
 
 CHAMELEON_DIR = os.path.join(os.getcwd(), "chameleon_files")
-DATA_DIR = os.path.join(os.getcwd(), "data")
+DATA_DIR = os.path.join(os.getcwd(), "data", "cached_data")
 
 
 def load_chameleon():
@@ -68,10 +68,13 @@ def get_test_dataset(dataset_name, subset, split="test"):
 
 def extract_grades(chameleon_model, chameleon_processor, dataset):
 
+    images = []
     grades = []
+    g_truth = []
+
     prompt = """
     Extract all subjects and their corresponding grades from the document in the image below. 
-    Each subject and grade pair should be identified and listed. 
+    Each subject and grade pair should be identified and listed. This means you have to read the text in the image and extract the information.
     For clarity, the output should be formatted similarly to this example:
     {
     "year_9": [
@@ -85,11 +88,14 @@ def extract_grades(chameleon_model, chameleon_processor, dataset):
         {"subject": "Artistic Drawing", "grade": "55"}
     ]
     }
+    Note that the subjects and grades in the example are not real and are only meant to illustrate the expected output format.
+    Now is your turn to extract the subjects and grades from the following image.
     <image>
     """
 
-    for sample in dataset:
+    for i, sample in enumerate(dataset):
         image = sample["image"]
+        gt = sample["ground_truth"]
 
         if not isinstance(image, Image.Image):
             image = Image.fromarray(image)
@@ -97,10 +103,25 @@ def extract_grades(chameleon_model, chameleon_processor, dataset):
         inputs = processor(prompt, image, return_tensors="pt").to(model.device, torch.bfloat16)
 
         output = chameleon_model.generate(**inputs, max_new_tokens=1024)
+        output = processor.decode(output[0], skip_special_tokens=True)
+        
+        images.append(image)
         grades.append(output)
+        g_truth.append(gt)
 
-        break
+        if i > 2:
+            break
 
+    return images, grades, g_truth
+
+
+def compare_results(extracted_grades, gt_grades):
+
+    for i, (ext, gt) in enumerate(zip(extracted_grades, gt_grades)):
+        logging.info(f"Sample {i}")
+        logging.info(f"Extracted: {ext}")
+        logging.info(f"Ground Truth: {gt}")
+        logging.info("")
 
 if __name__ == "__main__":
 
@@ -112,5 +133,7 @@ if __name__ == "__main__":
     test_set = get_test_dataset("de-Rodrigo/merit", "en-digital-seq")
 
     # Process samples
-    grades = extract_grades(model, processor, test_set)
-    print(grades)
+    imgs, extracted_grades, gt_grades = extract_grades(model, processor, test_set)
+    
+    # Compare results
+    compare_results(extracted_grades, gt_grades)

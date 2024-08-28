@@ -10,12 +10,5 @@ docker build -f dockerfiles/your_card/Dockerfile -t chameleon .
 
 ### Run :boom: or Debug :no_entry_sign::bug: the docker
 ```bash
-docker run -p 5678:5678 -v chameleon_files:/app/chameleon_files -it --gpus all chameleon
-```
-
--v nombre_del_volumen:/var/lib/mysql
-
-### Inspect default dataset using a volume
-```bash
-docker run chameleon
+docker run -p 5678:5678 -v /your_path_to_chameleon_files:/app/chameleon_files -v /your_path_to_data_files:/app/data-it --gpus all chameleon
 ```
