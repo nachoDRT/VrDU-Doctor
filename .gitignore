@@ -13,6 +13,7 @@ single/layoutxlm/models
 single/donut/dataset_inspection
 single/chameleon/chameleon_files/processor
 single/chameleon/chameleon_files/model
+single/chameleon/data/cached_data
 
 postprocess/models/*/
 !postprocess/models/*.*
