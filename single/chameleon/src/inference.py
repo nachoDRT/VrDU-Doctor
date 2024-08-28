@@ -9,6 +9,7 @@ from transformers import ChameleonProcessor, ChameleonForConditionalGeneration
 
 
 CHAMELEON_DIR = os.path.join(os.getcwd(), "chameleon_files")
+DATA_DIR = os.path.join(os.getcwd(), "data")
 
 
 def load_chameleon():
@@ -60,7 +61,7 @@ def get_chameleon():
 
 
 def get_test_dataset(dataset_name, subset, split="test"):
-    dataset = load_dataset(dataset_name, name=subset, split=split, num_proc=8)
+    dataset = load_dataset(dataset_name, name=subset, split=split, num_proc=8, cache_dir=DATA_DIR)
 
     return dataset
 
