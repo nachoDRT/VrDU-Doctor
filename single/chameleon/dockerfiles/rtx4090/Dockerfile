@@ -1,4 +1,4 @@
-FROM nvidia/cuda:11.7.1-base-ubuntu22.04
+FROM nvidia/cuda:11.8.0-base-ubuntu22.04
 
 # Install Python 3.10
 RUN apt-get update && apt-get install -y \
@@ -14,8 +14,8 @@ RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1
 # Create the working directory
 WORKDIR /app
 
-RUN pip install torch==1.13.0+cu117 torchvision==0.14.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
-RUN pip install git+https://github.com/huggingface/transformers
+RUN pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu118
+RUN pip install git+https://github.com/huggingface/transformers.git
 
 # Copy and install requirements
 COPY dockerfiles/rtx4090/requirements.txt .
