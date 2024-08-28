@@ -35,8 +35,8 @@ def download_chameleon():
     logging.info("Downloading Chameleon Model")
     model = ChameleonForConditionalGeneration.from_pretrained(
         "facebook/chameleon-7b",
-        torch_dtype=torch.float16,
-        device_map="cuda",
+        torch_dtype=torch.bfloat16,
+        device_map="cuda:0",
         cache_dir=os.path.join(CHAMELEON_DIR, "model"),
     )
 
