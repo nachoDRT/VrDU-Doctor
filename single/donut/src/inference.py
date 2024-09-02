@@ -42,20 +42,34 @@ def get_image():
     return img
 
 
-def compute_saliency(outputs, pixels, token_index=0):
+def compute_saliency(outputs, pixels, donut_p):
 
     token_logits = torch.stack(outputs.scores, dim=1)
     token_probs = torch.softmax(token_logits, dim=-1)
 
-    target_token_prob = token_probs[0, token_index, outputs.sequences[0, token_index]]
+    print(len(outputs.sequences[0]))
+    print(len(token_probs[0]))
 
-    if pixels.grad is not None:
-        pixels.grad.zero_()
+    for token_index in range(len(token_probs[0])):
 
-    target_token_prob.backward(retain_graph=True)
+        target_token_prob = token_probs[
+            0, token_index, outputs.sequences[0, token_index]
+        ]
 
-    saliency = pixels.grad.data.abs().squeeze().mean(dim=0).cpu().numpy()
-    save_img(saliency, os.path.join(SALIENCIES_ROOT, "saliency.png"))
+        if pixels.grad is not None:
+            pixels.grad.zero_()
+
+        target_token_prob.backward(retain_graph=True)
+
+        saliency = pixels.grad.data.abs().squeeze().mean(dim=0).cpu().numpy()
+
+        token_id = outputs.sequences[0][token_index].item()
+        token_text = donut_p.tokenizer.decode([token_id])
+        log_info(f"Considered sequence token: {token_text}")
+
+        safe_token_text = re.sub(r'[<>:"/\\|?*]', "_", token_text)
+        file_name = f"saliency_{safe_token_text}.png"
+        save_img(saliency, os.path.join(SALIENCIES_ROOT, file_name))
 
     return token_index
 
@@ -97,11 +111,7 @@ def compute_output(donut_m, donut_p, pixels):
     )
 
     if SALIENCY:
-        token_index = compute_saliency(outputs, pixels, 11)
-
-    token_id = outputs.sequences[0][token_index].item()
-    token_text = donut_p.tokenizer.decode([token_id])
-    log_info(f"Considered sequence token: {token_text}")
+        compute_saliency(outputs, pixels, donut_p)
 
     sequence = donut_p.batch_decode(outputs.sequences)[0]
     sequence = sequence.replace(donut_p.tokenizer.eos_token, "").replace(
