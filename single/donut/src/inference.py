@@ -37,7 +37,7 @@ def get_image():
 def compute_output(donut_m, donut_p):
     log_info("Computing Output")
 
-    task_prompt = ""
+    task_prompt = "<s_cord-v2>"
     decoder_input_ids = donut_p.tokenizer(
         task_prompt, add_special_tokens=False, return_tensors="pt"
     )["input_ids"]
