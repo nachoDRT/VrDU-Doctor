@@ -5,3 +5,4 @@ sentencepiece
 pytorch-lightning
 wandb
 nltk
+matplotlib
