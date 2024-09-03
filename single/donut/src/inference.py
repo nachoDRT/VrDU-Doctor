@@ -1,8 +1,10 @@
 import re
 import os
+import cv2
 import torch
 import logging
-import matplotlib.pyplot as plt
+import numpy as np
+from utils import add_transparent_image, convert_tensor_to_rgba_image
 from datasets import load_dataset
 from transformers import DonutProcessor, VisionEncoderDecoderModel
 
@@ -37,18 +39,13 @@ def get_image():
     dataset = load_dataset("hf-internal-testing/example-documents")
     img = dataset["test"][2]["image"]
 
-    save_img(img, os.path.join(SALIENCIES_ROOT, "dataset_img.png"))
-
     return img
 
 
-def compute_saliency(outputs, pixels, donut_p):
+def compute_saliency(outputs, pixels, donut_p, image):
 
     token_logits = torch.stack(outputs.scores, dim=1)
     token_probs = torch.softmax(token_logits, dim=-1)
-
-    print(len(outputs.sequences[0]))
-    print(len(token_probs[0]))
 
     for token_index in range(len(token_probs[0])):
 
@@ -61,7 +58,7 @@ def compute_saliency(outputs, pixels, donut_p):
 
         target_token_prob.backward(retain_graph=True)
 
-        saliency = pixels.grad.data.abs().squeeze().mean(dim=0).cpu().numpy()
+        saliency = pixels.grad.data.abs().squeeze().mean(dim=0)
 
         token_id = outputs.sequences[0][token_index].item()
         token_text = donut_p.tokenizer.decode([token_id])
@@ -69,19 +66,22 @@ def compute_saliency(outputs, pixels, donut_p):
 
         safe_token_text = re.sub(r'[<>:"/\\|?*]', "_", token_text)
         file_name = f"saliency_{safe_token_text}.png"
+
+        saliency = convert_tensor_to_rgba_image(saliency)
+        saliency = add_transparent_image(np.array(image), saliency)
         save_img(saliency, os.path.join(SALIENCIES_ROOT, file_name))
 
     return token_index
 
 
 def save_img(img, path):
-    plt.imshow(img, cmap="hot")
-    plt.axis("off")
-    plt.savefig(path)
-    plt.close()
+
+    if img.dtype != np.uint8:
+        img = (255 * img / np.max(img)).astype(np.uint8)
+    cv2.imwrite(path, img)
 
 
-def compute_output(donut_m, donut_p, pixels):
+def compute_output(donut_m, donut_p, pixels, image):
     log_info("Computing Output")
 
     task_prompt = "<s_cord-v2>"
@@ -111,7 +111,7 @@ def compute_output(donut_m, donut_p, pixels):
     )
 
     if SALIENCY:
-        compute_saliency(outputs, pixels, donut_p)
+        compute_saliency(outputs, pixels, donut_p, image)
 
     sequence = donut_p.batch_decode(outputs.sequences)[0]
     sequence = sequence.replace(donut_p.tokenizer.eos_token, "").replace(
@@ -137,5 +137,5 @@ if __name__ == "__main__":
     pixel_values = processor(image, return_tensors="pt").pixel_values
 
     # Get output
-    output = compute_output(model, processor, pixel_values)
+    output = compute_output(model, processor, pixel_values, image)
     print(output)

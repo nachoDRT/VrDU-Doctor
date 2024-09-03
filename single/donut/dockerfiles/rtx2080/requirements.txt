@@ -6,3 +6,4 @@ pytorch-lightning
 wandb
 nltk
 matplotlib
+opencv-python-headless
