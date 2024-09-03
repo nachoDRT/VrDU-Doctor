@@ -5,6 +5,7 @@ import torch
 import utils
 import logging
 import numpy as np
+from PIL import Image
 from datasets import load_dataset
 from transformers import DonutProcessor, VisionEncoderDecoderModel
 
@@ -29,11 +30,23 @@ def get_donut():
     return model, processor
 
 
+def resize_image(image, new_width):
+
+    original_width, original_height = image.size
+    new_height = int((new_width / original_width) * original_height)
+    resized_image = image.resize((new_width, new_height), Image.LANCZOS)
+    
+    return resized_image
+
+
 def get_image():
     log_info("Loading Image")
 
-    dataset = load_dataset("de-Rodrigo/merit", "en-digital-seq")
-    img = dataset["test"][2]["image"]
+    dataset = load_dataset("de-Rodrigo/merit", "en-digital-seq", split='train', streaming=True)
+    iterator = iter(dataset)
+    sample = next(iterator)
+    img = sample["image"]
+    img = resize_image(img, 512)
 
     return img
 
