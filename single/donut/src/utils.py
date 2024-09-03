@@ -85,3 +85,11 @@ def convert_tensor_to_rgba_image(tensor):
     saliency_rgba = cv2.merge((heatmap, alpha_channel))
 
     return saliency_rgba
+
+
+def convert_rgb_to_rgba_image(image):
+
+    alpha_channel = np.ones(image.shape[:2], dtype=image.dtype) * 255
+    rbga = cv2.merge((cv2.cvtColor(image, cv2.COLOR_RGB2BGR), alpha_channel))
+
+    return rbga

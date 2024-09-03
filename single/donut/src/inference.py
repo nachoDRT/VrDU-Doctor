@@ -2,9 +2,9 @@ import re
 import os
 import cv2
 import torch
+import utils
 import logging
 import numpy as np
-from utils import add_transparent_image, convert_tensor_to_rgba_image
 from datasets import load_dataset
 from transformers import DonutProcessor, VisionEncoderDecoderModel
 
@@ -67,8 +67,14 @@ def compute_saliency(outputs, pixels, donut_p, image):
         safe_token_text = re.sub(r'[<>:"/\\|?*]', "_", token_text)
         file_name = f"saliency_{safe_token_text}.png"
 
-        saliency = convert_tensor_to_rgba_image(saliency)
-        saliency = add_transparent_image(np.array(image), saliency)
+        saliency = utils.convert_tensor_to_rgba_image(saliency)
+
+        """Merge saliency image twice 1st: remove black background and fuse, 
+        2nd fuse again to still see original document"""
+        saliency = utils.add_transparent_image(np.array(image), saliency)
+        saliency = utils.convert_rgb_to_rgba_image(saliency)
+        saliency = utils.add_transparent_image(np.array(image), saliency, 0.7)
+
         save_img(saliency, os.path.join(SALIENCIES_ROOT, file_name))
 
     return token_index
