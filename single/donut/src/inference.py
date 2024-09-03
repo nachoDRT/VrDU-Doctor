@@ -46,6 +46,7 @@ def compute_saliency(outputs, pixels, donut_p, image):
 
     token_logits = torch.stack(outputs.scores, dim=1)
     token_probs = torch.softmax(token_logits, dim=-1)
+    token_texts = []
 
     for token_index in range(len(token_probs[0])):
 
@@ -76,6 +77,9 @@ def compute_saliency(outputs, pixels, donut_p, image):
         saliency = utils.add_transparent_image(np.array(image), saliency, 0.7)
 
         save_img(saliency, os.path.join(SALIENCIES_ROOT, file_name))
+        token_texts.append(token_text)
+
+    utils.saliency_video(SALIENCIES_ROOT, token_texts)
 
     return token_index
 

@@ -1,5 +1,9 @@
 import cv2
+import os
+import cv2
+import glob
 import numpy as np
+from datetime import datetime
 
 
 def add_transparent_image(
@@ -93,3 +97,41 @@ def convert_rgb_to_rgba_image(image):
     rbga = cv2.merge((cv2.cvtColor(image, cv2.COLOR_RGB2BGR), alpha_channel))
 
     return rbga
+
+
+def saliency_video(path, sequence):
+
+    image_files = sorted(glob.glob(os.path.join(path, "*.png")), key=os.path.getctime)
+    image = cv2.imread(image_files[0])
+    height = image.shape[0]
+    widht = image.shape[1]
+
+    # Create a VideoWriter object to save the video
+    video_name = os.path.join(path, "saliency.mp4")
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+
+    video = cv2.VideoWriter(video_name, fourcc, 5, (widht, height))
+
+    for image_file, token in zip(image_files, sequence):
+
+        image = cv2.imread(image_file)
+
+        # Add the text
+        text = token
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 1
+        text_color = (255, 255, 255)  # White color
+        text_thickness = 2
+        text_size, _ = cv2.getTextSize(text, font, font_scale, text_thickness)
+        text_position = (10, 10 + text_size[1])
+        cv2.putText(
+            image, text, text_position, font, font_scale, text_color, text_thickness
+        )
+
+        # Write the image to the video
+        video.write(image)
+
+    # Release the VideoWriter object
+    video.release()
+
+    print(f"Video saved as {video_name}")
