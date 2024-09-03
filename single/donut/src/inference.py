@@ -22,13 +22,9 @@ def log_info(msg: str):
 def get_donut():
     log_info("Loading Model and Processor")
 
-    model = VisionEncoderDecoderModel.from_pretrained(
-        "naver-clova-ix/donut-base-finetuned-cord-v2"
-    )
+    model = VisionEncoderDecoderModel.from_pretrained("de-Rodrigo/donut-merit")
 
-    processor = DonutProcessor.from_pretrained(
-        "naver-clova-ix/donut-base-finetuned-cord-v2"
-    )
+    processor = DonutProcessor.from_pretrained("de-Rodrigo/donut-merit")
 
     return model, processor
 
@@ -36,7 +32,7 @@ def get_donut():
 def get_image():
     log_info("Loading Image")
 
-    dataset = load_dataset("hf-internal-testing/example-documents")
+    dataset = load_dataset("de-Rodrigo/merit", "en-digital-seq")
     img = dataset["test"][2]["image"]
 
     return img
