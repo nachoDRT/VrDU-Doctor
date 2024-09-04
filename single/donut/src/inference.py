@@ -11,8 +11,9 @@ from datasets import load_dataset
 from transformers import DonutProcessor, VisionEncoderDecoderModel
 
 
-SALIENCY = True
+SALIENCY = False
 SALIENCIES_ROOT = "/app/saliencies/files/"
+SAMPLES_LIMIT = 3
 
 
 def log_info(msg: str):
@@ -40,16 +41,25 @@ def resize_image(image, new_width):
     return resized_image
 
 
-def get_image():
-    log_info("Loading Image")
+def get_dataset_iterator():
+    log_info("Loading Dataset")
 
     dataset = load_dataset(
         "de-Rodrigo/merit", "en-digital-seq", split="train", streaming=True
     )
-    iterator = iter(dataset)
-    sample = next(iterator)
+    dataset_iterator = iter(dataset)
+
+    return dataset_iterator
+
+
+def get_image(sample):
+    log_info("Getting Image")
+
+    # sample = next(iterator)
     img = sample["image"]
-    img = resize_image(img, 512)
+
+    if SALIENCY:
+        img = resize_image(img, 512)
 
     return img
 
@@ -149,6 +159,24 @@ def compute_output(donut_m, donut_p, pixels, image):
     return sequence
 
 
+def process_dataset(dataset_iterator):
+
+    for i, sample in enumerate(dataset_iterator):
+
+        # Get image
+        image = get_image(sample)
+
+        # Prepare image
+        pixel_values = processor(image, return_tensors="pt").pixel_values
+
+        # Get output
+        output = compute_output(model, processor, pixel_values, image)
+        print(output)
+
+        if i + 1 >= SAMPLES_LIMIT:
+            break
+
+
 if __name__ == "__main__":
 
     # Project config
@@ -157,12 +185,8 @@ if __name__ == "__main__":
     # Load model and processor
     model, processor = get_donut()
 
-    # Get image
-    image = get_image()
+    # Get dataset
+    dataset_iter = get_dataset_iterator()
 
-    # Prepare image
-    pixel_values = processor(image, return_tensors="pt").pixel_values
-
-    # Get output
-    output = compute_output(model, processor, pixel_values, image)
-    print(output)
+    # Process datset
+    process_dataset(dataset_iter)
