@@ -7,3 +7,4 @@ wandb
 nltk
 matplotlib
 opencv-python-headless
+donut-python

@@ -1,13 +1,16 @@
 import re
 import os
 import cv2
+import json
 import torch
 import utils
 import logging
 import numpy as np
 from PIL import Image
+from tqdm.auto import tqdm
 from datetime import datetime
 from datasets import load_dataset
+from donut import JSONParseEvaluator
 from transformers import DonutProcessor, VisionEncoderDecoderModel
 
 
@@ -52,16 +55,18 @@ def get_dataset_iterator():
     return dataset_iterator
 
 
-def get_image(sample):
+def get_sample_data(sample):
+
     log_info("Getting Image")
 
-    # sample = next(iterator)
     img = sample["image"]
+    gt = json.loads(sample["ground_truth"])
+    gt = gt["gt_parse"]
 
     if SALIENCY:
         img = resize_image(img, 512)
 
-    return img
+    return img, gt
 
 
 def compute_saliency(outputs, pixels, donut_p, image):
@@ -118,7 +123,7 @@ def save_img(img, path):
     cv2.imwrite(path, img)
 
 
-def compute_output(donut_m, donut_p, pixels, image):
+def compute_output(donut_m, donut_p, evaluator, pixels, image, gt):
     log_info("Computing Output")
 
     task_prompt = "<s_cord-v2>"
@@ -156,25 +161,38 @@ def compute_output(donut_m, donut_p, pixels, image):
     )
     sequence = re.sub(r"<.*?>", "", sequence, count=1).strip()
 
-    return sequence
+    seq = processor.token2json(sequence)
+    score = evaluator.cal_acc(seq, gt)
+
+    return seq, score
 
 
 def process_dataset(dataset_iterator):
+    evaluator = JSONParseEvaluator()
+    accs = []
+    output_list = []
 
     for i, sample in enumerate(dataset_iterator):
 
-        # Get image
-        image = get_image(sample)
+        # Get image and ground truth
+        image, gt = get_sample_data(sample)
 
         # Prepare image
         pixel_values = processor(image, return_tensors="pt").pixel_values
 
         # Get output
-        output = compute_output(model, processor, pixel_values, image)
-        print(output)
+        output_seq, score = compute_output(
+            model, processor, evaluator, pixel_values, image, gt
+        )
+
+        accs.append(score)
+        output_list.append(output_seq)
+        log_info(f"Grades detected: {output_seq}")
 
         if i + 1 >= SAMPLES_LIMIT:
             break
+
+    log_info(f"Mean accuracy: {np.mean(accs)}")
 
 
 if __name__ == "__main__":
