@@ -99,6 +99,39 @@ def convert_rgb_to_rgba_image(image):
     return rbga
 
 
+def label_frame(image, token):
+
+    # Add the text
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 0.7
+    text_color = (255, 255, 255)
+    text_thickness = 1
+    text_size, _ = cv2.getTextSize(token, font, font_scale, text_thickness)
+    text_position = (10, 10 + text_size[1])
+
+    # Draw a rectangle behind the text
+    rectangle_color = (0, 0, 0)
+    rectangle_thickness = -1
+    rectangle_position = (10, 10)
+    rectangle_size = (text_size[0] + 5, text_size[1] + 5)
+    cv2.rectangle(
+        image,
+        rectangle_position,
+        (
+            rectangle_position[0] + rectangle_size[0],
+            rectangle_position[1] + rectangle_size[1],
+        ),
+        rectangle_color,
+        rectangle_thickness,
+    )
+
+    cv2.putText(
+        image, token, text_position, font, font_scale, text_color, text_thickness
+    )
+
+    return image
+
+
 def saliency_video(path, sequence):
 
     image_files = sorted(glob.glob(os.path.join(path, "*.png")), key=os.path.getctime)
@@ -115,18 +148,6 @@ def saliency_video(path, sequence):
     for image_file, token in zip(image_files, sequence):
 
         image = cv2.imread(image_file)
-
-        # Add the text
-        text = token
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 1
-        text_color = (255, 255, 255)  # White color
-        text_thickness = 2
-        text_size, _ = cv2.getTextSize(text, font, font_scale, text_thickness)
-        text_position = (10, 10 + text_size[1])
-        cv2.putText(
-            image, text, text_position, font, font_scale, text_color, text_thickness
-        )
 
         # Write the image to the video
         video.write(image)

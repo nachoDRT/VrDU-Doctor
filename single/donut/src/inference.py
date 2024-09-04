@@ -6,6 +6,7 @@ import utils
 import logging
 import numpy as np
 from PIL import Image
+from datetime import datetime
 from datasets import load_dataset
 from transformers import DonutProcessor, VisionEncoderDecoderModel
 
@@ -35,14 +36,16 @@ def resize_image(image, new_width):
     original_width, original_height = image.size
     new_height = int((new_width / original_width) * original_height)
     resized_image = image.resize((new_width, new_height), Image.LANCZOS)
-    
+
     return resized_image
 
 
 def get_image():
     log_info("Loading Image")
 
-    dataset = load_dataset("de-Rodrigo/merit", "en-digital-seq", split='train', streaming=True)
+    dataset = load_dataset(
+        "de-Rodrigo/merit", "en-digital-seq", split="train", streaming=True
+    )
     iterator = iter(dataset)
     sample = next(iterator)
     img = sample["image"]
@@ -75,7 +78,10 @@ def compute_saliency(outputs, pixels, donut_p, image):
         log_info(f"Considered sequence token: {token_text}")
 
         safe_token_text = re.sub(r'[<>:"/\\|?*]', "_", token_text)
-        file_name = f"saliency_{safe_token_text}.png"
+        current_datetime = datetime.now().strftime("%Y%m%d%H%M%S")
+
+        unique_safe_token_text = f"{safe_token_text}_{current_datetime}"
+        file_name = f"saliency_{unique_safe_token_text}.png"
 
         saliency = utils.convert_tensor_to_rgba_image(saliency)
 
@@ -84,6 +90,8 @@ def compute_saliency(outputs, pixels, donut_p, image):
         saliency = utils.add_transparent_image(np.array(image), saliency)
         saliency = utils.convert_rgb_to_rgba_image(saliency)
         saliency = utils.add_transparent_image(np.array(image), saliency, 0.7)
+
+        saliency = utils.label_frame(saliency, token_text)
 
         save_img(saliency, os.path.join(SALIENCIES_ROOT, file_name))
         token_texts.append(token_text)
