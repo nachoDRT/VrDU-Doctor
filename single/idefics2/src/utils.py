@@ -30,7 +30,7 @@ class Idefics2Dataset(Dataset):
         self.processor = processor
         self.model = model
 
-        self.dataset = load_dataset(dataset_name_or_path, name=subset, split=self.split)
+        self.dataset = load_dataset(dataset_name_or_path, name=subset, split=self.split, num_proc=8)
         self.dataset_length = len(self.dataset)
 
         self.gt_token_sequences = []
