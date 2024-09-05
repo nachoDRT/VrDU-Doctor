@@ -11,6 +11,7 @@ single/layoutxlm/config/wandb_logging.json
 single/layoutxlm/data
 single/layoutxlm/models
 single/donut/dataset_inspection
+single/donut/saliencies/files
 
 postprocess/models/*/
 !postprocess/models/*.*
