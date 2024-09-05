@@ -170,7 +170,7 @@ def process_dataset(dataset_iterator, model, processor, prompt):
         )
 
         # Convert to dict
-        generated_json = utils.token2json(generated_texts[0])
+        generated_json = utils.token2json(generated_texts[0], processor)
 
         log_info(f"Grades detected: {generated_json}")
 
