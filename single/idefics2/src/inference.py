@@ -18,8 +18,9 @@ You can find Niels project here:
 https://github.com/NielsRogge/Transformers-Tutorials/tree/master/Idefics2
 """
 
-EMBEDDINGS_REPO = "nielsr/idefics2-embeddings"
-DATASET = {"name": "naver-clova-ix/cord-v2", "subset": "", "split": "train"}
+PEFT_MODEL_ID = "de-Rodrigo/idefics2-merit"
+EMBEDDINGS_REPO = ""
+DATASET = {"name": "de-Rodrigo/merit", "subset": "en-digital-seq", "split": "train"}
 SAMPLES_LIMIT = 2
 SALIENCY = False
 
@@ -38,6 +39,9 @@ def log_error(msg: str):
 
 def resize_embeddings(model, processor, repo_name):
 
+    log_info(f"MODEL before resizing embeddings: {model.get_input_embeddings().weight.shape}")
+
+    # TODO: Re-train and save input/output embeddings!!
     try:
         # Input embeddings
         filepath = hf_hub_download(
@@ -73,16 +77,24 @@ def resize_embeddings(model, processor, repo_name):
         log_error(f"Error when resizing embeddigns: {e}")
         log_info("Unable to load saved embeddings. Resizing embeddigns from scratch")
         dummy_dataset = utils.Idefics2Dataset(
-            processor, model, DATASET["name"], DATASET["subset"], DATASET["train"]
+            processor, model, DATASET["name"], DATASET["subset"], DATASET["split"]
         )
 
-    return model
+        model_with_embeddings = dummy_dataset.get_model()
+        log_info(f"MODEL (WITH EMBEDDINGS): {model.get_input_embeddings().weight.shape}")
+        
+        processor = dummy_dataset.get_processor()
+        
+        model.resize_token_embeddings(len(processor.tokenizer))
+        model.set_input_embeddings(model_with_embeddings.get_input_embeddings())
+        model.set_output_embeddings(model_with_embeddings.get_output_embeddings())
+
+    return model, processor
 
 
 def get_idefics2():
-    peft_model_id = "nielsr/idefics2-cord-demo"
 
-    processor = AutoProcessor.from_pretrained(peft_model_id)
+    processor = AutoProcessor.from_pretrained(PEFT_MODEL_ID)
 
     # Define quantization config
     quantization_config = BitsAndBytesConfig(
@@ -92,12 +104,12 @@ def get_idefics2():
     )
     # Load the base model with adapters on top
     model = Idefics2ForConditionalGeneration.from_pretrained(
-        peft_model_id,
+        PEFT_MODEL_ID,
         torch_dtype=torch.float16,
         quantization_config=quantization_config,
     )
 
-    model = resize_embeddings(model, processor, EMBEDDINGS_REPO)
+    model, processor = resize_embeddings(model, processor, EMBEDDINGS_REPO)
 
     return model, processor
 
@@ -125,7 +137,7 @@ def config_prompt(processor):
     ]
     prompt = processor.apply_chat_template(messages, add_generation_prompt=True)
 
-    return prompt
+    return prompt, processor
 
 
 def resize_image(image, new_width):
@@ -190,7 +202,7 @@ if __name__ == "__main__":
     dataset_iter = get_dataset_iterator()
 
     # Config prompt
-    i2_prompt = config_prompt(i2_processor)
+    i2_prompt, i2_processor = config_prompt(i2_processor)
 
     # Inference
     process_dataset(dataset_iter, i2_model, i2_processor, i2_prompt)

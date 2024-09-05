@@ -4,7 +4,11 @@ import random
 from datasets import load_dataset
 from typing import Any, List, Dict
 from torch.utils.data import Dataset
+from peft import prepare_model_for_kbit_training, LoraConfig, get_peft_model
 
+USE_LORA = False
+USE_QLORA = True
+USE_ADD_ADAPTER = True
 
 class Idefics2Dataset(Dataset):
     """
@@ -128,6 +132,28 @@ class Idefics2Dataset(Dataset):
         target_sequence = random.choice(self.gt_token_sequences[idx])
 
         return image, target_sequence
+    
+    def get_model(self):
+        print(f"ADDED TOKENS: {self.add_tokens}")
+        print(f"ADDED TOKENS: {len(self.added_tokens)}")
+
+        if not USE_ADD_ADAPTER:
+            lora_config = LoraConfig(
+                    r=8,
+                    lora_alpha=8,
+                    lora_dropout=0.1,
+                    target_modules=".*(text_model|modality_projection|perceiver_resampler).*(down_proj|gate_proj|up_proj|k_proj|q_proj|v_proj|o_proj).*$",
+                    use_dora=False if USE_QLORA else True,
+                    init_lora_weights="gaussian",
+                )
+
+            self.model = prepare_model_for_kbit_training(self.model)
+            self.model = get_peft_model(self.model, lora_config)
+
+        return self.model
+    
+    def get_processor(self):
+        return self.processor
 
 
 def token2json(tokens, processor, is_inner_value=False, added_vocab=None):
