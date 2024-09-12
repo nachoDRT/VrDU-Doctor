@@ -19,6 +19,8 @@ from torch.utils.data import Dataset
 from pytorch_lightning.callbacks import EarlyStopping, Callback
 from pytorch_lightning.loggers import WandbLogger
 
+HF_CARD_FILES = ["/app/card/README.md", "/app/card/.huggingface.yaml", "/app/card/assets/dragon_huggingface.png"]
+
 
 class DonutModelPLModule(pl.LightningModule):
     def __init__(self, config, processor, model):
@@ -269,21 +271,50 @@ class DonutDataset(Dataset):
 class PushToHubCallback(Callback):
     def on_train_epoch_end(self, trainer, pl_module):
         print(f"Pushing model to the hub, epoch {trainer.current_epoch}")
-        pl_module.model.push_to_hub("de-Rodrigo/donut-merit",
-            commit_message=f"Training in progress, epoch {trainer.current_epoch}")
+        pl_module.model.push_to_hub(f"de-Rodrigo/{model_output_name}",
+            commit_message=f"Training in progress, epoch {trainer.current_epoch}",
+            files_to_upload=HF_CARD_FILES)
 
     def on_train_end(self, trainer, pl_module):
         print(f"Pushing model to the hub after training")
-        pl_module.processor.push_to_hub("de-Rodrigo/donut-merit",
-            commit_message=f"Training done")
-        pl_module.model.push_to_hub("de-Rodrigo/donut-merit",
-            commit_message=f"Training done")
+        pl_module.processor.push_to_hub(f"de-Rodrigo/{model_output_name}",
+            commit_message=f"Training done",
+            files_to_upload=HF_CARD_FILES)
+        pl_module.model.push_to_hub(f"de-Rodrigo/{model_output_name}",
+            commit_message=f"Training done",
+            files_to_upload=HF_CARD_FILES)
+        
+def load_session_datasets(dataset_name: str, subset: str = ""):
+
+    train_dataset = DonutDataset(
+        dataset_name,
+        subset=subset,
+        max_length=max_length,
+        split="train",
+        task_start_token="<s_cord-v2>",
+        prompt_end_token="<s_cord-v2>",
+        sort_json_key=False,
+    )
+
+    val_dataset = DonutDataset(
+        dataset_name,
+        subset=subset,
+        max_length=max_length,
+        split="validation",
+        task_start_token="<s_cord-v2>",
+        prompt_end_token="<s_cord-v2>",
+        sort_json_key=False,
+    )
+
+    return train_dataset, val_dataset
 
 if __name__ == "__main__":
 
     # Define parsing values
     parser = argparse.ArgumentParser()
     parser.add_argument("--debug", type=str)
+    parser.add_argument("--dataset_name", type=str)
+    parser.add_argument("--subset", type=str)
     args = parser.parse_args()
 
     # Debug
@@ -291,6 +322,11 @@ if __name__ == "__main__":
         debugpy.listen(("0.0.0.0", 5678))
         print("Waiting for debugger to connect...")
         debugpy.wait_for_client()
+
+    # Define constants
+    dataset = args.dataset_name
+    dataset_subset = args.dataset_subset
+    model_output_name = "".join(["donut-", dataset])
 
     # Load model and processor
     image_size = [1280, 960]
@@ -309,25 +345,7 @@ if __name__ == "__main__":
     processor.image_processor.size = image_size[::-1]
     processor.image_processor.do_align_long_axis = False
 
-    train_dataset = DonutDataset(
-        "de-Rodrigo/merit",
-        subset="en-digital-seq",
-        max_length=max_length,
-        split="train",
-        task_start_token="<s_cord-v2>",
-        prompt_end_token="<s_cord-v2>",
-        sort_json_key=False,
-    )
-
-    val_dataset = DonutDataset(
-        "de-Rodrigo/merit",
-        subset="en-digital-seq",
-        max_length=max_length,
-        split="validation",
-        task_start_token="<s_cord-v2>",
-        prompt_end_token="<s_cord-v2>",
-        sort_json_key=False,
-    )
+    train_dataset, val_dataset = load_session_datasets(dataset_name=dataset, subset=dataset_subset)
 
     model.config.pad_token_id = processor.tokenizer.pad_token_id
     model.config.decoder_start_token_id = processor.tokenizer.convert_tokens_to_ids(
