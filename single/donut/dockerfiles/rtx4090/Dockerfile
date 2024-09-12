@@ -15,7 +15,6 @@ RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1
 WORKDIR /app
 
 RUN pip install torch==1.13.0+cu117 torchvision==0.14.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
-RUN pip install 'git+https://github.com/facebookresearch/detectron2.git'
 
 # Copy and install requirements
 COPY dockerfiles/rtx4090/requirements.txt .
