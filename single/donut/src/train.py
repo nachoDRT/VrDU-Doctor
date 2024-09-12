@@ -137,7 +137,7 @@ class DonutDataset(Dataset):
         )
         self.sort_json_key = sort_json_key
 
-        self.dataset = load_dataset(dataset_name_or_path, name=subset, split=self.split)
+        self.dataset = load_dataset(dataset_name_or_path, name=subset, split=self.split, num_proc=8)
         self.dataset_length = len(self.dataset)
 
         self.gt_token_sequences = []
