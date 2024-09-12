@@ -8,3 +8,4 @@ nltk
 matplotlib
 opencv-python-headless
 donut-python
+git-lfs

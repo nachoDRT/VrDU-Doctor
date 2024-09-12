@@ -4,6 +4,9 @@ import json
 import random
 import torch
 import re
+import os
+import wandb
+from huggingface_hub import login, HfApi
 import pytorch_lightning as pl
 import numpy as np
 from datasets import load_dataset
@@ -19,7 +22,7 @@ from torch.utils.data import Dataset
 from pytorch_lightning.callbacks import EarlyStopping, Callback
 from pytorch_lightning.loggers import WandbLogger
 
-HF_CARD_FILES = ["/app/card/README.md", "/app/card/.huggingface.yaml", "/app/card/assets/dragon_huggingface.png"]
+HF_CARD_FILES = ["/app/src/card/README.md", "/app/src/card/.huggingface.yaml", "/app/src/card/assets/dragon_huggingface.png"]
 
 
 class DonutModelPLModule(pl.LightningModule):
@@ -269,20 +272,33 @@ class DonutDataset(Dataset):
 
 
 class PushToHubCallback(Callback):
+    def __init__(self):
+        self.api = HfApi()
     def on_train_epoch_end(self, trainer, pl_module):
         print(f"Pushing model to the hub, epoch {trainer.current_epoch}")
         pl_module.model.push_to_hub(f"de-Rodrigo/{model_output_name}",
-            commit_message=f"Training in progress, epoch {trainer.current_epoch}",
-            files_to_upload=HF_CARD_FILES)
+            commit_message=f"Training in progress, epoch {trainer.current_epoch}")
+        self._upload_card_files(model_output_name)
 
     def on_train_end(self, trainer, pl_module):
         print(f"Pushing model to the hub after training")
         pl_module.processor.push_to_hub(f"de-Rodrigo/{model_output_name}",
-            commit_message=f"Training done",
-            files_to_upload=HF_CARD_FILES)
+            commit_message=f"Training done")
         pl_module.model.push_to_hub(f"de-Rodrigo/{model_output_name}",
-            commit_message=f"Training done",
-            files_to_upload=HF_CARD_FILES)
+            commit_message=f"Training done")
+        self._upload_card_files(model_output_name)
+    
+    def _upload_card_files(self, model_output_name):
+            repo_id = f"de-Rodrigo/{model_output_name}"
+            for file in HF_CARD_FILES:
+                print(f"Uploading {file} to {repo_id}")
+                self.api.upload_file(
+                    path_or_fileobj=file,
+                    path_in_repo='/'.join(file.split('/')[4:]),
+                    repo_id=repo_id,
+                    repo_type="model",
+                    commit_message="Uploading additional files"
+                )
         
 def load_session_datasets(dataset_name: str, subset: str = ""):
 
@@ -314,7 +330,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--debug", type=str)
     parser.add_argument("--dataset_name", type=str)
-    parser.add_argument("--subset", type=str)
+    parser.add_argument("--dataset_subset", type=str)
     args = parser.parse_args()
 
     # Debug
@@ -326,7 +342,7 @@ if __name__ == "__main__":
     # Define constants
     dataset = args.dataset_name
     dataset_subset = args.dataset_subset
-    model_output_name = "".join(["donut-", dataset])
+    model_output_name = "".join(["donut-", dataset.split('/')[-1]])
 
     # Load model and processor
     image_size = [1280, 960]
@@ -353,9 +369,7 @@ if __name__ == "__main__":
     )[0]
 
     # Dataloaders
-    train_dataloader = DataLoader(
-        train_dataset, batch_size=1, shuffle=True, num_workers=4
-    )
+    train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=4)
     val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=4)
 
     # Train
@@ -375,6 +389,9 @@ if __name__ == "__main__":
     }
 
     model_module = DonutModelPLModule(config, processor, model)
+
+    login(token=os.getenv("HUGGINGFACE_HUB_TOKEN"))
+    wandb.login(key=os.getenv("WANDB_API_KEY"))
     wandb_logger = WandbLogger(project="Donut", name="demo-run-cord")
 
     early_stop_callback = EarlyStopping(
@@ -391,7 +408,7 @@ if __name__ == "__main__":
         precision=16,
         num_sanity_val_steps=0,
         logger=wandb_logger,
-        callbacks=[early_stop_callback],
+        callbacks=[PushToHubCallback(),  early_stop_callback],
     )
 
     trainer.fit(model_module)

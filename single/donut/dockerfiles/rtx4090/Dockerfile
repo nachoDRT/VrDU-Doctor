@@ -27,6 +27,10 @@ COPY . .
 # Create symbolic link for python
 RUN ln -s /usr/bin/python3.10 /usr/bin/python
 
+# Include your SAaS tokens
+ENV WANDB_API_KEY=<your_access_token>
+ENV HUGGINGFACE_HUB_TOKEN=<your_access_token>
+
 # Execute the training
 RUN chmod +x src/start.sh
 CMD ["bash", "src/start.sh"]
