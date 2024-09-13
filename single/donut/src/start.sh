@@ -5,7 +5,7 @@ chmod +x src/utils/inspect_hf_dataset.py
 
 python src/train.py \
     --debug False \
-    --dataset_name naver-clova-ix/cord-v2 \
-    --dataset_subset ""
+    --dataset_name de-Rodrigo/merit \
+    --dataset_subset 'en-digital-seq'
 
 # python src/inference.py
