@@ -22,7 +22,7 @@
 ```python
 from transformers import AutoProcessor, AutoModel
 
-processor = AutoProcessor.from_pretrained("de-Rodrigo/donut-merit")
-model = AutoModel.from_pretrained("de-Rodrigo/donut-merit")
+processor = AutoProcessor.from_pretrained("de-Rodrigo/donut-cord-v2")
+model = AutoModel.from_pretrained("de-Rodrigo/donut-cord-v2")
 ```
 **WIP** 🛠️
