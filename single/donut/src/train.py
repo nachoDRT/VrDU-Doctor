@@ -374,7 +374,7 @@ if __name__ == "__main__":
 
     # Train
     config = {
-        "max_steps": 1000,
+        "max_steps": 10000,
         "val_check_interval": 0.2,
         "check_val_every_n_epoch": 1,
         "gradient_clip_val": 1.0,
@@ -402,13 +402,14 @@ if __name__ == "__main__":
         accelerator="gpu",
         devices=1,
         max_epochs=config.get("max_epochs"),
+        max_steps=config.get("max_steps"),
         val_check_interval=config.get("val_check_interval"),
         check_val_every_n_epoch=config.get("check_val_every_n_epoch"),
         gradient_clip_val=config.get("gradient_clip_val"),
         precision=16,
         num_sanity_val_steps=0,
         logger=wandb_logger,
-        callbacks=[PushToHubCallback(),  early_stop_callback],
+        callbacks=[PushToHubCallback()],
     )
 
     trainer.fit(model_module)
