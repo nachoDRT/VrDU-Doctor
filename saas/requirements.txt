@@ -1,1 +1,3 @@
 openai
+donut-python
+datasets
