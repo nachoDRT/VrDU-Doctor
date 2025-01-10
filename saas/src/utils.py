@@ -66,7 +66,7 @@ def get_dataset_iterator():
 
     print("Loading Dataset")
 
-    dataset = load_dataset("de-Rodrigo/merit", "en-render-seq", split="train", streaming=True)
+    dataset = load_dataset("de-Rodrigo/merit", "en-digital-seq", split="test", streaming=True)
     dataset_iterator = iter(dataset)
 
     return dataset_iterator

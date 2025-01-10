@@ -3,7 +3,7 @@ from donut import JSONParseEvaluator
 import numpy as np
 from utils import *
 
-SAMPLES_LIMIT = 1
+SAMPLES_LIMIT = 100
 
 
 def get_ouput_seq(base64_image, client):
