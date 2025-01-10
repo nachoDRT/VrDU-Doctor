@@ -1,3 +1,4 @@
 openai
 donut-python
 datasets
+mistralai

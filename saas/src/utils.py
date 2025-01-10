@@ -29,6 +29,7 @@ def init_apis():
     secrets_path = join(dirname(dirname(abspath(__file__))), "config", "secrets.json")
     secrets = load_secrets(secrets_path)
     os.environ["OPENAI_API_KEY"] = secrets["openai"]
+    os.environ["MISTRAL_API_KEY"] = secrets["mistral"]
 
 
 def detect_json(response: str) -> str:
