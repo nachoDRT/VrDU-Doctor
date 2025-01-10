@@ -1,58 +1,9 @@
-import base64
-import json
-import os
-from os.path import join, abspath, dirname
 from openai import OpenAI
-from typing import Dict
 from donut import JSONParseEvaluator
 import numpy as np
-from datasets import load_dataset
-from io import BytesIO
+from utils import *
 
-SAMPLES_LIMIT = 100
-
-
-def encode_image(img):
-
-    buffered = BytesIO()
-    img.save(buffered, format="PNG")
-    img_bytes = buffered.getvalue()
-
-    return base64.b64encode(img_bytes).decode("utf-8")
-
-
-def load_secrets(file_path: str) -> Dict:
-
-    with open(file_path, encoding="utf-8") as config_file:
-        secrets = json.load(config_file)
-
-    return secrets
-
-
-def init_apis():
-
-    secrets_path = join(dirname(dirname(abspath(__file__))), "config", "secrets.json")
-    secrets = load_secrets(secrets_path)
-    os.environ["OPENAI_API_KEY"] = secrets["openai"]
-
-
-def detect_json(response: str) -> str:
-
-    start = response.find("{")
-    response = response[start:]
-    end = response.rfind("}")
-    response = response[: end + 1]
-
-    return response
-
-
-def clean_json(grades: str) -> Dict:
-
-    raw_json = grades.encode("utf-8").decode("unicode_escape")
-    corrected_json = raw_json.encode("latin-1").decode("utf-8")
-    grades_dict = json.loads(corrected_json)
-
-    return grades_dict
+SAMPLES_LIMIT = 1
 
 
 def get_ouput_seq(base64_image, client):
@@ -93,27 +44,6 @@ def get_ouput_seq(base64_image, client):
     grades = clean_json(grades)
 
     return grades
-
-
-def get_sample_data(sample):
-
-    print("Getting Image")
-
-    img = sample["image"]
-    gt = json.loads(sample["ground_truth"])
-    gt = gt["gt_parse"]
-
-    return img, gt
-
-
-def get_dataset_iterator():
-
-    print("Loading Dataset")
-
-    dataset = load_dataset("de-Rodrigo/merit", "en-digital-seq", split="train", streaming=True)
-    dataset_iterator = iter(dataset)
-
-    return dataset_iterator
 
 
 def process_dataset(dataset_iterator):
