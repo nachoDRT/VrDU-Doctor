@@ -16,3 +16,7 @@ single/chameleon/data/cached_data
 
 postprocess/models/*/
 !postprocess/models/*.*
+
+saas/config/secrets.json
+
+*.pyc
