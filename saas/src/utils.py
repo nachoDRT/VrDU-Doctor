@@ -4,7 +4,7 @@ from typing import Dict
 from io import BytesIO
 from os.path import join, abspath, dirname
 import os
-from datasets import load_dataset
+from datasets import load_dataset, Image
 
 
 def encode_image(img):
@@ -54,7 +54,6 @@ def clean_json(grades: str) -> Dict:
 def get_sample_data(sample):
 
     print("Getting Image")
-
     img = sample["image"]
     gt = json.loads(sample["ground_truth"])
     gt = gt["gt_parse"]
@@ -62,11 +61,34 @@ def get_sample_data(sample):
     return img, gt
 
 
-def get_dataset_iterator():
+def get_sample_img_name(sample):
+
+    print("Getting Image Name")
+    img_name = sample["image"]["path"]
+
+    return img_name
+
+
+def get_dataset_iterator(decode=None):
 
     print("Loading Dataset")
 
     dataset = load_dataset("de-Rodrigo/merit", "en-digital-seq", split="test", streaming=True)
+
+    if decode:
+        dataset = dataset.cast_column("image", Image(decode=False))
+
     dataset_iterator = iter(dataset)
 
     return dataset_iterator
+
+
+def save_dataset_jsonl(file_name, dataset_jsonl):
+
+    path = join(dirname(dirname(abspath(__file__))), "output", file_name)
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+
+    with open(path, "w") as f:
+        for item in dataset_jsonl:
+            f.write(json.dumps(item) + "\n")
