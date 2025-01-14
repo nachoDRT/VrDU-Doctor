@@ -16,7 +16,7 @@ def upload_image_to_github(base64_image, image_name, upload_img: bool = False):
     repo = secrets["repo"]
     token = secrets["token"]
     branch = "main"
-    remote_file_name = "saas/data"
+    remote_file_name = "openai-vfinetune/data"
 
     api_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{remote_file_name}/{image_name}"
 
