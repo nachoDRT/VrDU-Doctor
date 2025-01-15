@@ -3,14 +3,32 @@ from donut import JSONParseEvaluator
 import numpy as np
 from utils import *
 
+
 SAMPLES_LIMIT = 100
 
 
-def get_ouput_seq(base64_image, client):
+def get_output_seq(base64_image, client, list_ft_models: bool = False):
+
+    if list_ft_models:
+        list_fine_tunes(client)
+
+    try:
+        model = get_model()
+    except:
+        model = "gpt-4o"
 
     response = client.chat.completions.create(
-        model="gpt-4o",
+        model=model,
         messages=[
+            {
+                "role": "system",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "You are an assistant that extracts grades from students' transcripts of records.",
+                    }
+                ],
+            },
             {
                 "role": "user",
                 "content": [
@@ -36,7 +54,7 @@ def get_ouput_seq(base64_image, client):
                         "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
                     },
                 ],
-            }
+            },
         ],
     )
 
@@ -60,7 +78,7 @@ def process_dataset(dataset_iterator):
 
         base64_image = encode_image(image)
 
-        seq = get_ouput_seq(base64_image, client)
+        seq = get_output_seq(base64_image, client)
         score = evaluator.cal_acc(seq, gt)
 
         accs.append(score)

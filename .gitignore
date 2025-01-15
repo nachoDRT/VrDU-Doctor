@@ -18,6 +18,7 @@ postprocess/models/*/
 !postprocess/models/*.*
 
 saas/config/secrets.json
+saas/config/config.json
 saas/output
 
 *.pyc

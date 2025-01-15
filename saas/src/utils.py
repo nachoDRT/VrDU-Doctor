@@ -17,11 +17,19 @@ def encode_image(img):
 
 
 def load_secrets(file_path: str) -> Dict:
+    return load_json(file_path)
+
+
+def load_config(file_path: str) -> Dict:
+    return load_json(file_path)
+
+
+def load_json(file_path: str) -> Dict:
 
     with open(file_path, encoding="utf-8") as config_file:
-        secrets = json.load(config_file)
+        file_content = json.load(config_file)
 
-    return secrets
+    return file_content
 
 
 def init_apis():
@@ -92,3 +100,30 @@ def save_dataset_jsonl(file_name, dataset_jsonl):
     with open(path, "w") as f:
         for item in dataset_jsonl:
             f.write(json.dumps(item) + "\n")
+
+
+def get_model():
+
+    config_path = join(dirname(dirname(abspath(__file__))), "config", "config.json")
+    config = load_config(config_path)
+
+    return config["model"]
+
+
+def list_fine_tunes(client):
+    try:
+        response = client.fine_tuning.jobs.list()
+
+        jobs = list(response)
+        if not jobs:
+            print("No fine-tuning jobs found.")
+            return
+
+        print("Fine-tuning jobs found:")
+        for job in jobs:
+            model_name = getattr(job, "fine_tuned_model", "N/A")
+            job_status = job.status
+            print(f"Job ID: {job.id}, Model: {model_name}, Status: {job_status}")
+
+    except Exception as e:
+        print(f"Error listing fine-tuning jobs: {e}")
