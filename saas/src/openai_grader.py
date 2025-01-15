@@ -74,6 +74,7 @@ def process_dataset(dataset_iterator):
 
     for i, sample in enumerate(dataset_iterator):
 
+        print(f"Processing img {i}")
         image, gt = get_sample_data(sample)
 
         base64_image = encode_image(image)
@@ -83,9 +84,9 @@ def process_dataset(dataset_iterator):
 
         accs.append(score)
         output_list.append(seq)
-        print(gt)
-        print(seq, score)
-        print("")
+        # print(gt)
+        # print(seq, score)
+        # print("")
 
         if i + 1 >= SAMPLES_LIMIT:
             break

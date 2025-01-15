@@ -54,14 +54,18 @@ def clean_json(grades: str) -> Dict:
 
     raw_json = grades.encode("utf-8").decode("unicode_escape")
     corrected_json = raw_json.encode("latin-1").decode("utf-8")
-    grades_dict = json.loads(corrected_json)
+
+    try:
+        grades_dict = json.loads(corrected_json)
+    except:
+        print(corrected_json)
+        grades_dict = {}
 
     return grades_dict
 
 
 def get_sample_data(sample):
 
-    print("Getting Image")
     img = sample["image"]
     gt = json.loads(sample["ground_truth"])
     gt = gt["gt_parse"]
