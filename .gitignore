@@ -26,4 +26,6 @@ vanillas/idefics2/log.txt
 vanillas/donut/log.txt
 vanillas/idefics3/log.txt
 
+vanillas/data
+
 *.pyc
