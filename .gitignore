@@ -21,4 +21,8 @@ saas/config/secrets.json
 saas/config/config.json
 saas/output
 
+vanillas/idefics2/files
+vanillas/idefics2/log.txt
+vanillas/donut/log.txt
+
 *.pyc
