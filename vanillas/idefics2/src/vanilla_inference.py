@@ -30,7 +30,7 @@ def get_dataset_iterator():
 
 def get_model_and_processor():
     
-    model = Idefics2ForConditionalGeneration.from_pretrained("files/", device_map="auto")
+    model = Idefics2ForConditionalGeneration.from_pretrained("files/")
     model.to(device)
 
     processor = Idefics2Processor.from_pretrained("HuggingFaceM4/idefics2-8b")
