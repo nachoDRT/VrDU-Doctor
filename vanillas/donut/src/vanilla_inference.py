@@ -8,7 +8,7 @@ from donut import JSONParseEvaluator
 import numpy as np
 
 
-SAMPLES_LIMIT = 2
+SAMPLES_LIMIT = 100
 
 
 def log_info(msg: str):
@@ -18,11 +18,10 @@ def log_info(msg: str):
 
 
 def get_model_and_processor():
-    
-    model = VisionEncoderDecoderModel.from_pretrained("naver-clova-ix/donut-base-finetuned-cord-v2")
+    model = VisionEncoderDecoderModel.from_pretrained("de-Rodrigo/donut-merit", subfolder="en-digital-paragraph-degradation-seq")
     model.to(device)
     
-    processor = DonutProcessor.from_pretrained("naver-clova-ix/donut-base-finetuned-cord-v2")
+    processor = DonutProcessor.from_pretrained("de-Rodrigo/donut-merit")
 
     return model, processor
 
