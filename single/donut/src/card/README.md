@@ -20,9 +20,9 @@
 ## Example Usage
 
 ```python
-from transformers import AutoProcessor, AutoModel
+from transformers import AutoTokenizer, AutoModelForImageTextToText
 
-processor = AutoProcessor.from_pretrained("de-Rodrigo/donut-merit")
-model = AutoModel.from_pretrained("de-Rodrigo/donut-merit")
+tokenizer = AutoTokenizer.from_pretrained("de-Rodrigo/donut-merit")
+model = AutoModelForImageTextToText.from_pretrained("de-Rodrigo/donut-merit")
 ```
 **WIP** 🛠️
