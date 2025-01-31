@@ -305,49 +305,49 @@ class PushToHubCallback(Callback):
         self.api = HfApi()
         self.model_output_name = model_output_name
         self.dataset_subset = dataset_subset
-        self.save_dir = save_dir  # Directorio donde se guardan los modelos
+        self.save_dir = save_dir
 
     def on_train_epoch_end(self, trainer, pl_module):
         """Sube el modelo al final de cada epoch."""
         print(f"Pushing model to the hub, epoch {trainer.current_epoch}")
 
-        # Guardar el modelo localmente en una carpeta específica
+        # Save model locally
         epoch_subfolder = os.path.join(self.save_dir, f"{self.model_output_name}_{self.dataset_subset}_epoch{trainer.current_epoch}")
         pl_module.model.save_pretrained(epoch_subfolder)
 
-        # Subir la variante a Hugging Face en una subcarpeta
+        # Upload model to the hub
         repo_id = f"de-Rodrigo/{self.model_output_name}"
         self.api.upload_folder(
             folder_path=epoch_subfolder,
-            path_in_repo=self.dataset_subset,  # Subcarpeta en el repo
+            path_in_repo=self.dataset_subset,
             repo_id=repo_id,
             repo_type="model",
             commit_message=f"Training in progress, epoch {trainer.current_epoch}"
         )
 
-        # Subir archivos extra como README o config
+        # Upload extra files
         self._upload_card_files(repo_id)
 
     def on_train_end(self, trainer, pl_module):
         """Sube la versión final del modelo después del entrenamiento."""
         print(f"Pushing model to the hub after training")
 
-        # Guardar modelo final en local
+        # Save model locally
         final_model_dir = os.path.join(self.save_dir, f"{self.model_output_name}_final")
         pl_module.model.save_pretrained(final_model_dir)
 
         repo_id = f"de-Rodrigo/{self.model_output_name}"
         
-        # Subir la versión final del modelo como la principal
+        # Upload model to the hub
         self.api.upload_folder(
             folder_path=final_model_dir,
-            path_in_repo=self.dataset_subset,  # Subcarpeta donde se guarda en HF
+            path_in_repo=self.dataset_subset,
             repo_id=repo_id,
             repo_type="model",
             commit_message="Training done, final model uploaded"
         )
 
-        # Subir archivos extra
+        # Upload extra files
         self._upload_card_files(repo_id)
 
     def _upload_card_files(self, repo_id):
@@ -356,7 +356,7 @@ class PushToHubCallback(Callback):
             print(f"Uploading {file} to {repo_id}")
             self.api.upload_file(
                 path_or_fileobj=file,
-                path_in_repo='/'.join(file.split('/')[4:]),  # Mantiene estructura
+                path_in_repo='/'.join(file.split('/')[4:]),
                 repo_id=repo_id,
                 repo_type="model",
                 commit_message="Uploading additional files"
@@ -437,7 +437,7 @@ if __name__ == "__main__":
 
     # Train
     config = {
-        "max_steps": 100,
+        "max_steps": 10000,
         "val_check_interval": 0.2,
         "check_val_every_n_epoch": 1,
         "gradient_clip_val": 1.0,

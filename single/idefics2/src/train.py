@@ -8,7 +8,7 @@ import os
 import wandb
 import lightning as L
 import numpy as np
-from huggingface_hub import login
+from huggingface_hub import login, HfApi
 from datasets import load_dataset
 from torch.utils.data import Dataset, DataLoader
 from typing import Any, List, Dict
@@ -32,6 +32,7 @@ USE_QLORA = True
 USE_ADD_ADAPTER = True
 MAX_LENGTH = 768
 MODEL_REPO_ID = "de-Rodrigo/idefics2-merit"
+HF_CARD_FILES = ["/app/src/card/README.md", "/app/src/card/.huggingface.yaml", "/app/src/card/assets/dragon_huggingface.png"]
 
 
 class Idefics2Dataset(Dataset):
@@ -207,18 +208,81 @@ class Idefics2ModelPLModule(L.LightningModule):
         return DataLoader(val_dataset, collate_fn=lambda examples: eval_collate_fn(examples, self.processor, self.model), batch_size=self.batch_size, shuffle=False, num_workers=4)
 
 
+# class PushToHubCallback(Callback):
+#     def on_train_epoch_end(self, trainer, pl_module):
+#         print(f"Pushing model to the hub, epoch {trainer.current_epoch}")
+#         pl_module.model.push_to_hub(MODEL_REPO_ID,
+#             commit_message=f"Training in progress, epoch {trainer.current_epoch}")
+
+#     def on_train_end(self, trainer, pl_module):
+#         print(f"Pushing model to the hub after training")
+#         pl_module.processor.push_to_hub(MODEL_REPO_ID,
+#             commit_message=f"Training done")
+#         pl_module.model.push_to_hub(MODEL_REPO_ID,
+#             commit_message=f"Training done")
+
+
 class PushToHubCallback(Callback):
+    def __init__(self, model_output_name, dataset_subset, save_dir="checkpoints"):
+        self.api = HfApi()
+        self.model_output_name = model_output_name
+        self.dataset_subset = dataset_subset
+        self.save_dir = save_dir
+
     def on_train_epoch_end(self, trainer, pl_module):
+        """Sube el modelo al final de cada epoch."""
         print(f"Pushing model to the hub, epoch {trainer.current_epoch}")
-        pl_module.model.push_to_hub(MODEL_REPO_ID,
-            commit_message=f"Training in progress, epoch {trainer.current_epoch}")
+
+        # Save model locally
+        epoch_subfolder = os.path.join(self.save_dir, f"{self.model_output_name}_{self.dataset_subset}_epoch{trainer.current_epoch}")
+        pl_module.model.save_pretrained(epoch_subfolder)
+
+        # Upload model to the hub
+        repo_id = f"de-Rodrigo/{self.model_output_name}"
+        self.api.upload_folder(
+            folder_path=epoch_subfolder,
+            path_in_repo=self.dataset_subset,
+            repo_id=repo_id,
+            repo_type="model",
+            commit_message=f"Training in progress, epoch {trainer.current_epoch}"
+        )
+
+        # Upload extra files
+        self._upload_card_files(repo_id)
 
     def on_train_end(self, trainer, pl_module):
+        """Sube la versión final del modelo después del entrenamiento."""
         print(f"Pushing model to the hub after training")
-        pl_module.processor.push_to_hub(MODEL_REPO_ID,
-            commit_message=f"Training done")
-        pl_module.model.push_to_hub(MODEL_REPO_ID,
-            commit_message=f"Training done")
+
+        # Save model locally
+        final_model_dir = os.path.join(self.save_dir, f"{self.model_output_name}_final")
+        pl_module.model.save_pretrained(final_model_dir)
+
+        repo_id = f"de-Rodrigo/{self.model_output_name}"
+        
+        # Upload model to the hub
+        self.api.upload_folder(
+            folder_path=final_model_dir,
+            path_in_repo=self.dataset_subset,
+            repo_id=repo_id,
+            repo_type="model",
+            commit_message="Training done, final model uploaded"
+        )
+
+        # Upload extra files
+        self._upload_card_files(repo_id)
+
+    def _upload_card_files(self, repo_id):
+        """Sube archivos adicionales como README, config.json, etc."""
+        for file in HF_CARD_FILES:
+            print(f"Uploading {file} to {repo_id}")
+            self.api.upload_file(
+                path_or_fileobj=file,
+                path_in_repo='/'.join(file.split('/')[4:]),
+                repo_id=repo_id,
+                repo_type="model",
+                commit_message="Uploading additional files"
+            )
 
 
 def load_model() -> Idefics2ForConditionalGeneration:
@@ -349,7 +413,7 @@ def eval_collate_fn(examples, processor, model):
 
 
 def init_pl_module(processor, model):
-    configuration = {"max_epochs": 10,
+    configuration = {"max_epochs": 1,
         "val_check_interval": 1.0,
         "check_val_every_n_epoch": 1,
         "gradient_clip_val": 1.0,
@@ -383,7 +447,7 @@ def train_idefics2(idefics2, configuration):
             precision=configuration.get("precision"),
             num_sanity_val_steps=0,
             logger=wandb_logger,
-            callbacks=[PushToHubCallback(), early_stop_callback],
+            callbacks=[PushToHubCallback(MODEL_REPO_ID, args.subset), early_stop_callback],
     )
 
     trainer.fit(idefics2)
