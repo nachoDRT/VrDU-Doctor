@@ -271,34 +271,97 @@ class DonutDataset(Dataset):
         return pixel_values, labels, target_sequence
 
 
+# class PushToHubCallback(Callback):
+#     def __init__(self):
+#         self.api = HfApi()
+#     def on_train_epoch_end(self, trainer, pl_module):
+#         print(f"Pushing model to the hub, epoch {trainer.current_epoch}")
+#         pl_module.model.push_to_hub(f"de-Rodrigo/{model_output_name}/{dataset_subset}",
+#             commit_message=f"Training in progress, epoch {trainer.current_epoch}")
+#         self._upload_card_files(model_output_name)
+
+#     def on_train_end(self, trainer, pl_module):
+#         print(f"Pushing model to the hub after training")
+#         pl_module.processor.push_to_hub(f"de-Rodrigo/{model_output_name}",
+#             commit_message=f"Training done")
+#         pl_module.model.push_to_hub(f"de-Rodrigo/{model_output_name}",
+#             commit_message=f"Training done")
+#         self._upload_card_files(model_output_name)
+    
+#     def _upload_card_files(self, model_output_name):
+#             repo_id = f"de-Rodrigo/{model_output_name}"
+#             for file in HF_CARD_FILES:
+#                 print(f"Uploading {file} to {repo_id}")
+#                 self.api.upload_file(
+#                     path_or_fileobj=file,
+#                     path_in_repo='/'.join(file.split('/')[4:]),
+#                     repo_id=repo_id,
+#                     repo_type="model",
+#                     commit_message="Uploading additional files"
+#                 )
+
 class PushToHubCallback(Callback):
-    def __init__(self):
+    def __init__(self, model_output_name, dataset_subset, save_dir="checkpoints"):
         self.api = HfApi()
+        self.model_output_name = model_output_name
+        self.dataset_subset = dataset_subset
+        self.save_dir = save_dir  # Directorio donde se guardan los modelos
+
     def on_train_epoch_end(self, trainer, pl_module):
+        """Sube el modelo al final de cada epoch."""
         print(f"Pushing model to the hub, epoch {trainer.current_epoch}")
-        pl_module.model.push_to_hub(f"de-Rodrigo/{model_output_name}",
-            commit_message=f"Training in progress, epoch {trainer.current_epoch}")
-        self._upload_card_files(model_output_name)
+
+        # Guardar el modelo localmente en una carpeta específica
+        epoch_subfolder = os.path.join(self.save_dir, f"{self.model_output_name}_{self.dataset_subset}_epoch{trainer.current_epoch}")
+        pl_module.model.save_pretrained(epoch_subfolder)
+
+        # Subir la variante a Hugging Face en una subcarpeta
+        repo_id = f"de-Rodrigo/{self.model_output_name}"
+        self.api.upload_folder(
+            folder_path=epoch_subfolder,
+            path_in_repo=self.dataset_subset,  # Subcarpeta en el repo
+            repo_id=repo_id,
+            repo_type="model",
+            commit_message=f"Training in progress, epoch {trainer.current_epoch}"
+        )
+
+        # Subir archivos extra como README o config
+        self._upload_card_files(repo_id)
 
     def on_train_end(self, trainer, pl_module):
+        """Sube la versión final del modelo después del entrenamiento."""
         print(f"Pushing model to the hub after training")
-        pl_module.processor.push_to_hub(f"de-Rodrigo/{model_output_name}",
-            commit_message=f"Training done")
-        pl_module.model.push_to_hub(f"de-Rodrigo/{model_output_name}",
-            commit_message=f"Training done")
-        self._upload_card_files(model_output_name)
-    
-    def _upload_card_files(self, model_output_name):
-            repo_id = f"de-Rodrigo/{model_output_name}"
-            for file in HF_CARD_FILES:
-                print(f"Uploading {file} to {repo_id}")
-                self.api.upload_file(
-                    path_or_fileobj=file,
-                    path_in_repo='/'.join(file.split('/')[4:]),
-                    repo_id=repo_id,
-                    repo_type="model",
-                    commit_message="Uploading additional files"
-                )
+
+        # Guardar modelo final en local
+        final_model_dir = os.path.join(self.save_dir, f"{self.model_output_name}_final")
+        pl_module.model.save_pretrained(final_model_dir)
+
+        repo_id = f"de-Rodrigo/{self.model_output_name}"
+        
+        # Subir la versión final del modelo como la principal
+        self.api.upload_folder(
+            folder_path=final_model_dir,
+            path_in_repo=self.dataset_subset,  # Subcarpeta donde se guarda en HF
+            repo_id=repo_id,
+            repo_type="model",
+            commit_message="Training done, final model uploaded"
+        )
+
+        # Subir archivos extra
+        self._upload_card_files(repo_id)
+
+    def _upload_card_files(self, repo_id):
+        """Sube archivos adicionales como README, config.json, etc."""
+        for file in HF_CARD_FILES:
+            print(f"Uploading {file} to {repo_id}")
+            self.api.upload_file(
+                path_or_fileobj=file,
+                path_in_repo='/'.join(file.split('/')[4:]),  # Mantiene estructura
+                repo_id=repo_id,
+                repo_type="model",
+                commit_message="Uploading additional files"
+            )
+
         
 def load_session_datasets(dataset_name: str, subset: str = ""):
 
@@ -374,7 +437,7 @@ if __name__ == "__main__":
 
     # Train
     config = {
-        "max_steps": 10000,
+        "max_steps": 100,
         "val_check_interval": 0.2,
         "check_val_every_n_epoch": 1,
         "gradient_clip_val": 1.0,
@@ -392,7 +455,7 @@ if __name__ == "__main__":
 
     login(token=os.getenv("HUGGINGFACE_HUB_TOKEN"))
     wandb.login(key=os.getenv("WANDB_API_KEY"))
-    wandb_logger = WandbLogger(project="Donut", name="demo-run-cord")
+    wandb_logger = WandbLogger(project="Donut", name=dataset_subset)
 
     early_stop_callback = EarlyStopping(
         monitor="val_edit_distance", patience=3, verbose=False, mode="min"
@@ -409,7 +472,7 @@ if __name__ == "__main__":
         precision=16,
         num_sanity_val_steps=0,
         logger=wandb_logger,
-        callbacks=[PushToHubCallback()],
+        callbacks=[PushToHubCallback(model_output_name, dataset_subset)],
     )
 
     trainer.fit(model_module)

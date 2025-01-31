@@ -6,6 +6,6 @@ chmod +x src/utils/inspect_hf_dataset.py
 python src/train.py \
     --debug False \
     --dataset_name de-Rodrigo/merit \
-    --dataset_subset 'en-digital-seq'
+    --dataset_subset 'en-digital-paragraph-degradation-seq'
 
 # python src/inference.py

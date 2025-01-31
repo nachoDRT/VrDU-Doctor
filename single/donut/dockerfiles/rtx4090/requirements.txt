@@ -1,8 +1,8 @@
-debugpy
-transformers
-datasets
+debugpy==1.8.5
+transformers==4.44.2
+datasets==2.21.0
 sentencepiece
-pytorch-lightning
+pytorch-lightning==2.4.0
 wandb
 nltk
 matplotlib
