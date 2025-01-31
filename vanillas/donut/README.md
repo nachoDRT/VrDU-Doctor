@@ -1,7 +1,7 @@
-# Nvidia RTX2080
+# Nvidia RTX2080/4090
 Execute from ./VrDU-Doctor/vanillas/donut
 
-Available cards: `RTX2080`
+Available cards: `RTX2080`, `RTX4090`
 
 ### Create the docker :whale:
 ```bash
