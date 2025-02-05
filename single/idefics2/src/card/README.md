@@ -1,4 +1,16 @@
-# DONUT Merit
+---
+license: mit
+datasets:
+- de-Rodrigo/merit
+language:
+- en
+- es
+base_model:
+- HuggingFaceM4/idefics2-8b
+pipeline_tag: image-text-to-text
+---
+
+# IDEFICS2 Merit
 
 <a href="https://x.com/nearcyan/status/1706914605262684394">
   <div style="text-align: center;">
