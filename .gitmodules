@@ -1,3 +1,6 @@
 [submodule "transformers"]
 	path = transformers
 	url = https://github.com/nachoDRT/transformers.git
+[submodule "saas/MERIT-Subsets"]
+	path = saas/MERIT-Subsets
+	url = https://github.com/nachoDRT/MERIT-Subsets.git

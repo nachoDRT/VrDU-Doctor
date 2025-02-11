@@ -4,6 +4,9 @@ import json
 import random
 import torch
 import re
+import os
+import wandb
+from huggingface_hub import login, HfApi
 import pytorch_lightning as pl
 import numpy as np
 from datasets import load_dataset
@@ -18,6 +21,9 @@ from nltk import edit_distance
 from torch.utils.data import Dataset
 from pytorch_lightning.callbacks import EarlyStopping, Callback
 from pytorch_lightning.loggers import WandbLogger
+from PIL import Image
+
+HF_CARD_FILES = ["/app/src/card/README.md", "/app/src/card/.huggingface.yaml", "/app/src/card/assets/dragon_huggingface.png"]
 
 
 class DonutModelPLModule(pl.LightningModule):
@@ -137,7 +143,7 @@ class DonutDataset(Dataset):
         )
         self.sort_json_key = sort_json_key
 
-        self.dataset = load_dataset(dataset_name_or_path, name=subset, split=self.split)
+        self.dataset = load_dataset(dataset_name_or_path, name=subset, split=self.split, num_proc=8)
         self.dataset_length = len(self.dataset)
 
         self.gt_token_sequences = []
@@ -228,27 +234,47 @@ class DonutDataset(Dataset):
     def __len__(self) -> int:
         return self.dataset_length
 
+
+
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
-        Load image from image_path of given dataset_path and convert into input_tensor and labels
-        Convert gt data into input_ids (tokenized string)
+        Loads the image from the dataset at the given index, processes it into a tensor,
+        and tokenizes the corresponding ground truth sequence.
+
         Returns:
-            input_tensor : preprocessed image
-            input_ids : tokenized gt_data
-            labels : masked labels (model doesn't need to predict prompt and pad token)
+            pixel_values: Preprocessed image tensor.
+            labels: Tokenized ground truth sequence with masked tokens (model doesn't need to predict prompt or pad tokens).
+            target_sequence: The original ground truth string.
         """
+        # Retrieve the sample at index 'idx' from the dataset
         sample = self.dataset[idx]
 
-        # inputs
+        # Load the image from the sample
+        image = sample["image"]
+
+        # If the image is not a PIL Image, try converting it (e.g., from a NumPy array)
+        if not isinstance(image, Image.Image):
+            image = Image.fromarray(image)
+
+        # Convert the image to RGB if it's not already (this ensures 3 color channels)
+        if image.mode != "RGB":
+            image = image.convert("RGB")
+
+        # Process the image using the processor
+        # 'random_padding' is enabled for training to introduce variability
         pixel_values = processor(
-            sample["image"], random_padding=self.split == "train", return_tensors="pt"
+            image,
+            random_padding=self.split == "train",
+            return_tensors="pt"
         ).pixel_values
+        # Remove any extra dimensions added by the processor
         pixel_values = pixel_values.squeeze()
 
-        # targets
-        target_sequence = random.choice(
-            self.gt_token_sequences[idx]
-        )  # can be more than one, e.g., DocVQA Task 1
+        # Randomly select one target sequence from the available ground truth sequences for this sample
+        target_sequence = random.choice(self.gt_token_sequences[idx])
+        
+        # Tokenize the target sequence without adding special tokens
+        # The sequence is padded or truncated to 'max_length' and converted into a tensor
         input_ids = processor.tokenizer(
             target_sequence,
             add_special_tokens=False,
@@ -258,32 +284,138 @@ class DonutDataset(Dataset):
             return_tensors="pt",
         )["input_ids"].squeeze(0)
 
+        # Clone the tokenized input_ids to create labels, and mask out the pad tokens
         labels = input_ids.clone()
-        labels[labels == processor.tokenizer.pad_token_id] = (
-            self.ignore_id
-        )  # model doesn't need to predict pad token
-        # labels[: torch.nonzero(labels == self.prompt_end_token_id).sum() + 1] = self.ignore_id  # model doesn't need to predict prompt (for VQA)
+        labels[labels == processor.tokenizer.pad_token_id] = self.ignore_id
+
+        # Return the processed image tensor, the labels, and the original target sequence
         return pixel_values, labels, target_sequence
 
 
+
+# class PushToHubCallback(Callback):
+#     def __init__(self):
+#         self.api = HfApi()
+#     def on_train_epoch_end(self, trainer, pl_module):
+#         print(f"Pushing model to the hub, epoch {trainer.current_epoch}")
+#         pl_module.model.push_to_hub(f"de-Rodrigo/{model_output_name}/{dataset_subset}",
+#             commit_message=f"Training in progress, epoch {trainer.current_epoch}")
+#         self._upload_card_files(model_output_name)
+
+#     def on_train_end(self, trainer, pl_module):
+#         print(f"Pushing model to the hub after training")
+#         pl_module.processor.push_to_hub(f"de-Rodrigo/{model_output_name}",
+#             commit_message=f"Training done")
+#         pl_module.model.push_to_hub(f"de-Rodrigo/{model_output_name}",
+#             commit_message=f"Training done")
+#         self._upload_card_files(model_output_name)
+    
+#     def _upload_card_files(self, model_output_name):
+#             repo_id = f"de-Rodrigo/{model_output_name}"
+#             for file in HF_CARD_FILES:
+#                 print(f"Uploading {file} to {repo_id}")
+#                 self.api.upload_file(
+#                     path_or_fileobj=file,
+#                     path_in_repo='/'.join(file.split('/')[4:]),
+#                     repo_id=repo_id,
+#                     repo_type="model",
+#                     commit_message="Uploading additional files"
+#                 )
+
 class PushToHubCallback(Callback):
+    def __init__(self, model_output_name, dataset_subset, save_dir="checkpoints"):
+        self.api = HfApi()
+        self.model_output_name = model_output_name
+        self.dataset_subset = dataset_subset
+        self.save_dir = save_dir
+
     def on_train_epoch_end(self, trainer, pl_module):
+        """Sube el modelo al final de cada epoch."""
         print(f"Pushing model to the hub, epoch {trainer.current_epoch}")
-        pl_module.model.push_to_hub("de-Rodrigo/donut-merit",
-            commit_message=f"Training in progress, epoch {trainer.current_epoch}")
+
+        # Save model locally
+        epoch_subfolder = os.path.join(self.save_dir, f"{self.model_output_name}_{self.dataset_subset}_epoch{trainer.current_epoch}")
+        pl_module.model.save_pretrained(epoch_subfolder)
+
+        # Upload model to the hub
+        repo_id = f"de-Rodrigo/{self.model_output_name}"
+        self.api.upload_folder(
+            folder_path=epoch_subfolder,
+            path_in_repo=self.dataset_subset,
+            repo_id=repo_id,
+            repo_type="model",
+            commit_message=f"Training in progress, epoch {trainer.current_epoch}"
+        )
+
+        # Upload extra files
+        self._upload_card_files(repo_id)
 
     def on_train_end(self, trainer, pl_module):
+        """Sube la versión final del modelo después del entrenamiento."""
         print(f"Pushing model to the hub after training")
-        pl_module.processor.push_to_hub("de-Rodrigo/donut-merit",
-            commit_message=f"Training done")
-        pl_module.model.push_to_hub("de-Rodrigo/donut-merit",
-            commit_message=f"Training done")
+
+        # Save model locally
+        final_model_dir = os.path.join(self.save_dir, f"{self.model_output_name}_final")
+        pl_module.model.save_pretrained(final_model_dir)
+
+        repo_id = f"de-Rodrigo/{self.model_output_name}"
+        
+        # Upload model to the hub
+        self.api.upload_folder(
+            folder_path=final_model_dir,
+            path_in_repo=self.dataset_subset,
+            repo_id=repo_id,
+            repo_type="model",
+            commit_message="Training done, final model uploaded"
+        )
+
+        # Upload extra files
+        self._upload_card_files(repo_id)
+
+    def _upload_card_files(self, repo_id):
+        """Sube archivos adicionales como README, config.json, etc."""
+        for file in HF_CARD_FILES:
+            print(f"Uploading {file} to {repo_id}")
+            self.api.upload_file(
+                path_or_fileobj=file,
+                path_in_repo='/'.join(file.split('/')[4:]),
+                repo_id=repo_id,
+                repo_type="model",
+                commit_message="Uploading additional files"
+            )
+
+        
+def load_session_datasets(dataset_name: str, subset: str = ""):
+
+    train_dataset = DonutDataset(
+        dataset_name,
+        subset=subset,
+        max_length=max_length,
+        split="train",
+        task_start_token="<s_cord-v2>",
+        prompt_end_token="<s_cord-v2>",
+        sort_json_key=False,
+    )
+
+    val_dataset = DonutDataset(
+        dataset_name,
+        subset=subset,
+        max_length=max_length,
+        split="validation",
+        task_start_token="<s_cord-v2>",
+        prompt_end_token="<s_cord-v2>",
+        sort_json_key=False,
+    )
+
+    return train_dataset, val_dataset
 
 if __name__ == "__main__":
 
     # Define parsing values
     parser = argparse.ArgumentParser()
     parser.add_argument("--debug", type=str)
+    parser.add_argument("--dataset_name", type=str)
+    parser.add_argument("--dataset_subset", type=str)
     args = parser.parse_args()
 
     # Debug
@@ -291,6 +423,11 @@ if __name__ == "__main__":
         debugpy.listen(("0.0.0.0", 5678))
         print("Waiting for debugger to connect...")
         debugpy.wait_for_client()
+
+    # Define constants
+    dataset = args.dataset_name
+    dataset_subset = args.dataset_subset
+    model_output_name = "".join(["donut-", dataset.split('/')[-1]])
 
     # Load model and processor
     image_size = [1280, 960]
@@ -309,25 +446,7 @@ if __name__ == "__main__":
     processor.image_processor.size = image_size[::-1]
     processor.image_processor.do_align_long_axis = False
 
-    train_dataset = DonutDataset(
-        "de-Rodrigo/merit",
-        subset="en-digital-seq",
-        max_length=max_length,
-        split="train",
-        task_start_token="<s_cord-v2>",
-        prompt_end_token="<s_cord-v2>",
-        sort_json_key=False,
-    )
-
-    val_dataset = DonutDataset(
-        "de-Rodrigo/merit",
-        subset="en-digital-seq",
-        max_length=max_length,
-        split="validation",
-        task_start_token="<s_cord-v2>",
-        prompt_end_token="<s_cord-v2>",
-        sort_json_key=False,
-    )
+    train_dataset, val_dataset = load_session_datasets(dataset_name=dataset, subset=dataset_subset)
 
     model.config.pad_token_id = processor.tokenizer.pad_token_id
     model.config.decoder_start_token_id = processor.tokenizer.convert_tokens_to_ids(
@@ -335,15 +454,13 @@ if __name__ == "__main__":
     )[0]
 
     # Dataloaders
-    train_dataloader = DataLoader(
-        train_dataset, batch_size=1, shuffle=True, num_workers=4
-    )
+    train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=4)
     val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=4)
 
     # Train
     config = {
-        "max_steps": 1000,
-        "val_check_interval": 0.2,
+        "max_steps": 10000,
+        "val_check_interval": 0.5,
         "check_val_every_n_epoch": 1,
         "gradient_clip_val": 1.0,
         "num_training_samples_per_epoch": 800,
@@ -357,23 +474,27 @@ if __name__ == "__main__":
     }
 
     model_module = DonutModelPLModule(config, processor, model)
-    wandb_logger = WandbLogger(project="Donut", name="demo-run-cord")
+
+    login(token=os.getenv("HUGGINGFACE_HUB_TOKEN"))
+    wandb.login(key=os.getenv("WANDB_API_KEY"))
+    wandb_logger = WandbLogger(project="Donut", name=dataset_subset)
 
     early_stop_callback = EarlyStopping(
-        monitor="val_edit_distance", patience=3, verbose=False, mode="min"
+        monitor="val_edit_distance", patience=4, verbose=False, mode="min"
     )
 
     trainer = pl.Trainer(
         accelerator="gpu",
         devices=1,
         max_epochs=config.get("max_epochs"),
+        max_steps=config.get("max_steps"),
         val_check_interval=config.get("val_check_interval"),
         check_val_every_n_epoch=config.get("check_val_every_n_epoch"),
         gradient_clip_val=config.get("gradient_clip_val"),
         precision=16,
         num_sanity_val_steps=0,
         logger=wandb_logger,
-        callbacks=[early_stop_callback],
+        callbacks=[PushToHubCallback(model_output_name, dataset_subset)],
     )
 
     trainer.fit(model_module)

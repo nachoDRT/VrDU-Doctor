@@ -27,8 +27,8 @@ COPY . .
 RUN ln -s /usr/bin/python3.10 /usr/bin/python
 
 # Include your SAaS tokens
-ENV WANDB_API_KEY=<your_access_token>
-ENV HUGGINGFACE_HUB_TOKEN=<your_access_token>
+ENV WANDB_API_KEY=dfbc890a8028e5ab7ef7229b6efeebec2b0fa1e0
+ENV HUGGINGFACE_HUB_TOKEN=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
 
 # Execute the training
 RUN chmod +x src/start.sh

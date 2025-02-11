@@ -12,6 +12,22 @@ single/layoutxlm/data
 single/layoutxlm/models
 single/donut/dataset_inspection
 single/donut/saliencies/files
+single/chameleon/data/cached_data
 
 postprocess/models/*/
 !postprocess/models/*.*
+
+saas/config/secrets.json
+saas/config/config.json
+saas/output
+
+vanillas/idefics2/files
+vanillas/idefics2/log.txt
+vanillas/donut/log.txt
+vanillas/idefics3/log.txt
+
+vanillas/data
+
+*.pyc
+
+single/idefics2/log.txt

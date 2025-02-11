@@ -2,9 +2,10 @@ debugpy
 transformers
 datasets
 sentencepiece
-pytorch-lightning==2.4.0
+pytorch-lightning
 lightning
 wandb
 nltk
 peft
 bitsandbytes
+donut-python
