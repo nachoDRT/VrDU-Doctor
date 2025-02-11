@@ -6,11 +6,11 @@ language:
 - en
 - es
 base_model:
-- naver-clova-ix/donut-base-finetuned-cord-v2
+- HuggingFaceM4/idefics2-8b
 pipeline_tag: image-text-to-text
 ---
 
-# DONUT Merit
+# IDEFICS2 Merit
 
 <a href="https://x.com/nearcyan/status/1706914605262684394">
   <div style="text-align: center;">
@@ -26,15 +26,14 @@ pipeline_tag: image-text-to-text
 ## Model Architecture
 **This model is based on the Donut architecture and fine-tuned on the Merit dataset for form understanding tasks.**
 
-- Backbone: [Donut](https://huggingface.co/naver-clova-ix/donut-base)
+- Backbone: [Idefics2](https://huggingface.co/HuggingFaceM4/idefics2-8b)
 - Training Data: [Merit](https://huggingface.co/datasets/de-Rodrigo/merit)
 
 ## Example Usage
 
 ```python
-from transformers import AutoTokenizer, AutoModelForImageTextToText
+from transformers import AutoModel
 
-tokenizer = AutoTokenizer.from_pretrained("de-Rodrigo/donut-merit")
-model = AutoModelForImageTextToText.from_pretrained("de-Rodrigo/donut-merit")
+model = AutoModel.from_pretrained("de-Rodrigo/idefics2-merit")
 ```
 **WIP** 🛠️
