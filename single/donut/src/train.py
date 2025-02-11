@@ -336,6 +336,7 @@ class PushToHubCallback(Callback):
         # Save model locally
         epoch_subfolder = os.path.join(self.save_dir, f"{self.model_output_name}_{self.dataset_subset}_epoch{trainer.current_epoch}")
         pl_module.model.save_pretrained(epoch_subfolder)
+        pl_module.processor.save_pretrained(epoch_subfolder)
 
         # Upload model to the hub
         repo_id = f"de-Rodrigo/{self.model_output_name}"
@@ -357,6 +358,7 @@ class PushToHubCallback(Callback):
         # Save model locally
         final_model_dir = os.path.join(self.save_dir, f"{self.model_output_name}_final")
         pl_module.model.save_pretrained(final_model_dir)
+        pl_module.processor.save_pretrained(final_model_dir)
 
         repo_id = f"de-Rodrigo/{self.model_output_name}"
         
