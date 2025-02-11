@@ -2,6 +2,8 @@ from openai import OpenAI
 from donut import JSONParseEvaluator
 import numpy as np
 from utils import *
+import argparse
+from tqdm import tqdm
 
 
 SAMPLES_LIMIT = 100
@@ -72,9 +74,9 @@ def process_dataset(dataset_iterator):
     accs = []
     output_list = []
 
-    for i, sample in enumerate(dataset_iterator):
+    for i, sample in tqdm(enumerate(dataset_iterator)):
 
-        print(f"Processing img {i}")
+        # print(f"Processing img {i}")
         image, gt = get_sample_data(sample)
 
         base64_image = encode_image(image)
@@ -87,18 +89,30 @@ def process_dataset(dataset_iterator):
         # print(gt)
         # print(seq, score)
         # print("")
+        # print(score)
 
-        if i + 1 >= SAMPLES_LIMIT:
-            break
+        # if i + 1 >= SAMPLES_LIMIT:
+        #     break
 
-    print(f"Mean accuracy: {np.mean(accs)}")
+    return np.mean(accs)
 
 
 def main():
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dataset", type=str)
+    args = parser.parse_args()
+
+    dataset_name = args.dataset
+
     init_apis()
-    dataset_iterator = get_dataset_iterator()
-    process_dataset(dataset_iterator)
+    subsets = get_dataset_config_names(dataset_name)
+
+    for subset_name in subsets:
+        print(f"Processing {subset_name}")
+        dataset_iterator = get_dataset_iterator(dataset_name, subset_name)
+        mean_acc = process_dataset(dataset_iterator)
+        print(f"Mean accuracy {subset_name}: {mean_acc}")
 
 
 if __name__ == "__main__":
