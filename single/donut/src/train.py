@@ -21,6 +21,7 @@ from nltk import edit_distance
 from torch.utils.data import Dataset
 from pytorch_lightning.callbacks import EarlyStopping, Callback
 from pytorch_lightning.loggers import WandbLogger
+from PIL import Image
 
 HF_CARD_FILES = ["/app/src/card/README.md", "/app/src/card/.huggingface.yaml", "/app/src/card/assets/dragon_huggingface.png"]
 
@@ -233,27 +234,47 @@ class DonutDataset(Dataset):
     def __len__(self) -> int:
         return self.dataset_length
 
+
+
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
-        Load image from image_path of given dataset_path and convert into input_tensor and labels
-        Convert gt data into input_ids (tokenized string)
+        Loads the image from the dataset at the given index, processes it into a tensor,
+        and tokenizes the corresponding ground truth sequence.
+
         Returns:
-            input_tensor : preprocessed image
-            input_ids : tokenized gt_data
-            labels : masked labels (model doesn't need to predict prompt and pad token)
+            pixel_values: Preprocessed image tensor.
+            labels: Tokenized ground truth sequence with masked tokens (model doesn't need to predict prompt or pad tokens).
+            target_sequence: The original ground truth string.
         """
+        # Retrieve the sample at index 'idx' from the dataset
         sample = self.dataset[idx]
 
-        # inputs
+        # Load the image from the sample
+        image = sample["image"]
+
+        # If the image is not a PIL Image, try converting it (e.g., from a NumPy array)
+        if not isinstance(image, Image.Image):
+            image = Image.fromarray(image)
+
+        # Convert the image to RGB if it's not already (this ensures 3 color channels)
+        if image.mode != "RGB":
+            image = image.convert("RGB")
+
+        # Process the image using the processor
+        # 'random_padding' is enabled for training to introduce variability
         pixel_values = processor(
-            sample["image"], random_padding=self.split == "train", return_tensors="pt"
+            image,
+            random_padding=self.split == "train",
+            return_tensors="pt"
         ).pixel_values
+        # Remove any extra dimensions added by the processor
         pixel_values = pixel_values.squeeze()
 
-        # targets
-        target_sequence = random.choice(
-            self.gt_token_sequences[idx]
-        )  # can be more than one, e.g., DocVQA Task 1
+        # Randomly select one target sequence from the available ground truth sequences for this sample
+        target_sequence = random.choice(self.gt_token_sequences[idx])
+        
+        # Tokenize the target sequence without adding special tokens
+        # The sequence is padded or truncated to 'max_length' and converted into a tensor
         input_ids = processor.tokenizer(
             target_sequence,
             add_special_tokens=False,
@@ -263,12 +284,13 @@ class DonutDataset(Dataset):
             return_tensors="pt",
         )["input_ids"].squeeze(0)
 
+        # Clone the tokenized input_ids to create labels, and mask out the pad tokens
         labels = input_ids.clone()
-        labels[labels == processor.tokenizer.pad_token_id] = (
-            self.ignore_id
-        )  # model doesn't need to predict pad token
-        # labels[: torch.nonzero(labels == self.prompt_end_token_id).sum() + 1] = self.ignore_id  # model doesn't need to predict prompt (for VQA)
+        labels[labels == processor.tokenizer.pad_token_id] = self.ignore_id
+
+        # Return the processed image tensor, the labels, and the original target sequence
         return pixel_values, labels, target_sequence
+
 
 
 # class PushToHubCallback(Callback):
@@ -438,7 +460,7 @@ if __name__ == "__main__":
     # Train
     config = {
         "max_steps": 10000,
-        "val_check_interval": 0.2,
+        "val_check_interval": 0.5,
         "check_val_every_n_epoch": 1,
         "gradient_clip_val": 1.0,
         "num_training_samples_per_epoch": 800,
@@ -458,7 +480,7 @@ if __name__ == "__main__":
     wandb_logger = WandbLogger(project="Donut", name=dataset_subset)
 
     early_stop_callback = EarlyStopping(
-        monitor="val_edit_distance", patience=3, verbose=False, mode="min"
+        monitor="val_edit_distance", patience=4, verbose=False, mode="min"
     )
 
     trainer = pl.Trainer(
