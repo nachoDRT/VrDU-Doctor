@@ -238,7 +238,7 @@ class PushToHubCallback(Callback):
         pl_module.model.save_pretrained(epoch_subfolder)
 
         # Upload model to the hub
-        repo_id = f"de-Rodrigo/{self.model_output_name}"
+        repo_id = f"{self.model_output_name}"
         self.api.upload_folder(
             folder_path=epoch_subfolder,
             path_in_repo=self.dataset_subset,
@@ -258,7 +258,7 @@ class PushToHubCallback(Callback):
         final_model_dir = os.path.join(self.save_dir, f"{self.model_output_name}_final")
         pl_module.model.save_pretrained(final_model_dir)
 
-        repo_id = f"de-Rodrigo/{self.model_output_name}"
+        repo_id = f"{self.model_output_name}"
         
         # Upload model to the hub
         self.api.upload_folder(
@@ -413,9 +413,9 @@ def eval_collate_fn(examples, processor, model):
 
 
 def init_pl_module(processor, model):
-    configuration = {"max_epochs": 1,
+    configuration = {"max_epochs": 10,
         "val_check_interval": 1.0,
-        "check_val_every_n_epoch": 1,
+        "check_val_every_n_epoch": 2,
         "gradient_clip_val": 1.0,
         "accumulate_grad_batches": 8,
         "lr": 1e-4,
@@ -435,7 +435,7 @@ def init_pl_module(processor, model):
 def train_idefics2(idefics2, configuration):
     login(token=os.getenv("HUGGINGFACE_HUB_TOKEN"))
     wandb.login(key=os.getenv("WANDB_API_KEY"))
-    wandb_logger = WandbLogger(project="Idefics2", name="merit")
+    wandb_logger = WandbLogger(project="Idefics2", name=args.subset)
 
     trainer = L.Trainer(
             accelerator="gpu",
@@ -486,7 +486,7 @@ if __name__ == "__main__":
     image_token_id = idefics2_processor.tokenizer.additional_special_tokens_ids[idefics2_processor.tokenizer.additional_special_tokens.index("<image>")]
 
     # Callback
-    early_stop_callback = EarlyStopping(monitor="val_edit_distance", patience=2, verbose=False, mode="min")
+    early_stop_callback = EarlyStopping(monitor="val_edit_distance", patience=4, verbose=False, mode="min")
 
     # Pytorch Lightning module
     idefics2_module, config = init_pl_module(idefics2_processor, idefics2)

@@ -1,3 +1,15 @@
+---
+license: mit
+datasets:
+- de-Rodrigo/merit
+language:
+- en
+- es
+base_model:
+- naver-clova-ix/donut-base-finetuned-cord-v2
+pipeline_tag: image-text-to-text
+---
+
 # DONUT Merit
 
 <a href="https://x.com/nearcyan/status/1706914605262684394">

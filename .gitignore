@@ -29,3 +29,5 @@ vanillas/idefics3/log.txt
 vanillas/data
 
 *.pyc
+
+single/idefics2/log.txt
