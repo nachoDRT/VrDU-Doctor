@@ -4,7 +4,7 @@ from typing import Dict
 from io import BytesIO
 from os.path import join, abspath, dirname
 import os
-from datasets import load_dataset, Image
+from datasets import load_dataset, Image, get_dataset_config_names
 
 
 def encode_image(img):
@@ -67,8 +67,12 @@ def clean_json(grades: str) -> Dict:
 def get_sample_data(sample):
 
     img = sample["image"]
-    gt = json.loads(sample["ground_truth"])
-    gt = gt["gt_parse"]
+    gt = sample["ground_truth"]
+
+    gt = gt.replace("'", '"')
+    gt = json.loads(gt)
+
+    # gt = gt["gt_parse"]
 
     return img, gt
 
@@ -81,11 +85,9 @@ def get_sample_img_name(sample):
     return img_name
 
 
-def get_dataset_iterator(decode=None):
+def get_dataset_iterator(dataset_name: str, subset_name: str, decode=None):
 
-    print("Loading Dataset")
-
-    dataset = load_dataset("de-Rodrigo/merit", "en-digital-seq", split="test", streaming=True)
+    dataset = load_dataset(dataset_name, subset_name, split="test", streaming=True)
 
     if decode:
         dataset = dataset.cast_column("image", Image(decode=False))

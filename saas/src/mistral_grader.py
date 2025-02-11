@@ -3,6 +3,8 @@ import numpy as np
 from mistralai import Mistral
 from donut import JSONParseEvaluator
 from utils import *
+import argparse
+from tqdm import tqdm
 
 SAMPLES_LIMIT = 100
 
@@ -57,7 +59,7 @@ def process_dataset(dataset_iterator):
     accs = []
     output_list = []
 
-    for i, sample in enumerate(dataset_iterator):
+    for i, sample in tqdm(enumerate(dataset_iterator)):
 
         image, gt = get_sample_data(sample)
 
@@ -68,21 +70,40 @@ def process_dataset(dataset_iterator):
 
         accs.append(score)
         output_list.append(seq)
-        print(gt)
-        print(seq, score)
-        print("")
+        # print(gt)
+        # print(seq, score)
+        # print("")
 
-        if i + 1 >= SAMPLES_LIMIT:
-            break
+        # if i + 1 >= SAMPLES_LIMIT:
+        #     break
 
-    print(f"Mean accuracy: {np.mean(accs)}")
+    return np.mean(accs)
+
+    # print(f"Mean accuracy: {np.mean(accs)}")
 
 
 def main():
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dataset", type=str)
+    parser.add_argument("--subset", type=str)
+    args = parser.parse_args()
+
+    dataset_name = args.dataset
+    subset_name = args.subset
+
     init_apis()
-    # TODO specify dataset here
-    dataset_iterator = get_dataset_iterator()
-    process_dataset(dataset_iterator)
+
+    if subset_name == "all":
+        subsets = get_dataset_config_names(dataset_name)
+    else:
+        subsets = [subset_name]
+
+    for subset_name in subsets:
+        print(f"Processing {subset_name}")
+        dataset_iterator = get_dataset_iterator(dataset_name, subset_name)
+        mean_acc = process_dataset(dataset_iterator)
+        print(f"Mean accuracy {subset_name}: {mean_acc}")
 
 
 if __name__ == "__main__":
