@@ -210,9 +210,8 @@ class Idefics2ModelPLModule(L.LightningModule):
     def val_dataloader(self):
         percentage = 0.05
         num_samples = int(len(val_dataset) * percentage)
-
-        # Crear un sampler aleatorio
-        sampler = SubsetRandomSampler(torch.randperm(len(val_dataset))[:num_samples])
+        indices = torch.randperm(len(val_dataset))[:num_samples].tolist()
+        sampler = SubsetRandomSampler(indices)
 
         return DataLoader(
             val_dataset, 
@@ -221,6 +220,7 @@ class Idefics2ModelPLModule(L.LightningModule):
             batch_size=self.batch_size, 
             num_workers=4
         )
+
 
 class PushToHubCallback(Callback):
     def __init__(self, model_output_name, dataset_subset, save_dir="checkpoints"):
