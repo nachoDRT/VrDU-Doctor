@@ -431,7 +431,8 @@ if __name__ == "__main__":
     percentage = 0.1
     num_samples = int(len(val_dataset) * percentage)
     sampler = SubsetRandomSampler(torch.randperm(len(val_dataset))[:num_samples])
-    val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=4)
+    val_dataloader = DataLoader(val_dataset, batch_size=1, sampler=sampler, num_workers=4)
+
 
     # Train
     config = {
