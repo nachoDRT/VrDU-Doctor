@@ -10,7 +10,7 @@ import lightning as L
 import numpy as np
 from huggingface_hub import login, HfApi
 from datasets import load_dataset
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, SubsetRandomSampler
 from typing import Any, List, Dict
 from nltk import edit_distance
 from lightning.pytorch.callbacks import Callback
@@ -204,23 +204,23 @@ class Idefics2ModelPLModule(L.LightningModule):
     def train_dataloader(self):
         return DataLoader(train_dataset, collate_fn=lambda examples: train_collate_fn(examples, self.processor, self.model), batch_size=self.batch_size, shuffle=True, num_workers=4)
 
+    # def val_dataloader(self):
+    #     return DataLoader(val_dataset, collate_fn=lambda examples: eval_collate_fn(examples, self.processor, self.model), batch_size=self.batch_size, shuffle=False, num_workers=4)
+
     def val_dataloader(self):
-        return DataLoader(val_dataset, collate_fn=lambda examples: eval_collate_fn(examples, self.processor, self.model), batch_size=self.batch_size, shuffle=False, num_workers=4)
+        percentage = 0.05
+        num_samples = int(len(val_dataset) * percentage)
 
+        # Crear un sampler aleatorio
+        sampler = SubsetRandomSampler(torch.randperm(len(val_dataset))[:num_samples])
 
-# class PushToHubCallback(Callback):
-#     def on_train_epoch_end(self, trainer, pl_module):
-#         print(f"Pushing model to the hub, epoch {trainer.current_epoch}")
-#         pl_module.model.push_to_hub(MODEL_REPO_ID,
-#             commit_message=f"Training in progress, epoch {trainer.current_epoch}")
-
-#     def on_train_end(self, trainer, pl_module):
-#         print(f"Pushing model to the hub after training")
-#         pl_module.processor.push_to_hub(MODEL_REPO_ID,
-#             commit_message=f"Training done")
-#         pl_module.model.push_to_hub(MODEL_REPO_ID,
-#             commit_message=f"Training done")
-
+        return DataLoader(
+            val_dataset, 
+            sampler=sampler,
+            collate_fn=lambda examples: eval_collate_fn(examples, self.processor, self.model),
+            batch_size=self.batch_size, 
+            num_workers=4
+        )
 
 class PushToHubCallback(Callback):
     def __init__(self, model_output_name, dataset_subset, save_dir="checkpoints"):
