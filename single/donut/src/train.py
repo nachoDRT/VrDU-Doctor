@@ -16,7 +16,7 @@ from transformers import (
     VisionEncoderDecoderModel,
 )
 from typing import Any, List, Tuple
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, SubsetRandomSampler
 from nltk import edit_distance
 from torch.utils.data import Dataset
 from pytorch_lightning.callbacks import EarlyStopping, Callback
@@ -292,36 +292,6 @@ class DonutDataset(Dataset):
         return pixel_values, labels, target_sequence
 
 
-
-# class PushToHubCallback(Callback):
-#     def __init__(self):
-#         self.api = HfApi()
-#     def on_train_epoch_end(self, trainer, pl_module):
-#         print(f"Pushing model to the hub, epoch {trainer.current_epoch}")
-#         pl_module.model.push_to_hub(f"de-Rodrigo/{model_output_name}/{dataset_subset}",
-#             commit_message=f"Training in progress, epoch {trainer.current_epoch}")
-#         self._upload_card_files(model_output_name)
-
-#     def on_train_end(self, trainer, pl_module):
-#         print(f"Pushing model to the hub after training")
-#         pl_module.processor.push_to_hub(f"de-Rodrigo/{model_output_name}",
-#             commit_message=f"Training done")
-#         pl_module.model.push_to_hub(f"de-Rodrigo/{model_output_name}",
-#             commit_message=f"Training done")
-#         self._upload_card_files(model_output_name)
-    
-#     def _upload_card_files(self, model_output_name):
-#             repo_id = f"de-Rodrigo/{model_output_name}"
-#             for file in HF_CARD_FILES:
-#                 print(f"Uploading {file} to {repo_id}")
-#                 self.api.upload_file(
-#                     path_or_fileobj=file,
-#                     path_in_repo='/'.join(file.split('/')[4:]),
-#                     repo_id=repo_id,
-#                     repo_type="model",
-#                     commit_message="Uploading additional files"
-#                 )
-
 class PushToHubCallback(Callback):
     def __init__(self, model_output_name, dataset_subset, save_dir="checkpoints"):
         self.api = HfApi()
@@ -336,6 +306,7 @@ class PushToHubCallback(Callback):
         # Save model locally
         epoch_subfolder = os.path.join(self.save_dir, f"{self.model_output_name}_{self.dataset_subset}_epoch{trainer.current_epoch}")
         pl_module.model.save_pretrained(epoch_subfolder)
+        pl_module.processor.save_pretrained(epoch_subfolder)
 
         # Upload model to the hub
         repo_id = f"de-Rodrigo/{self.model_output_name}"
@@ -357,6 +328,7 @@ class PushToHubCallback(Callback):
         # Save model locally
         final_model_dir = os.path.join(self.save_dir, f"{self.model_output_name}_final")
         pl_module.model.save_pretrained(final_model_dir)
+        pl_module.processor.save_pretrained(final_model_dir)
 
         repo_id = f"de-Rodrigo/{self.model_output_name}"
         
@@ -455,7 +427,14 @@ if __name__ == "__main__":
 
     # Dataloaders
     train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=4)
-    val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=4)
+    
+    percentage = 0.1
+    num_samples = int(len(val_dataset) * percentage)
+    indices = torch.randperm(len(val_dataset))[:num_samples].tolist()
+    sampler = SubsetRandomSampler(indices)
+    val_dataloader = DataLoader(val_dataset, batch_size=1, sampler=sampler, num_workers=4)
+
+
 
     # Train
     config = {
