@@ -6,18 +6,28 @@ import argparse
 from tqdm import tqdm
 
 
-SAMPLES_LIMIT = 100
+# SAMPLES_LIMIT = 100
 
 
-def get_output_seq(base64_image, client, list_ft_models: bool = False):
+def get_output_seq(base64_image, client, model, lang):
 
-    if list_ft_models:
-        list_fine_tunes(client)
+    if lang == "english":
+        years = "'year_9', 'year_10', 'year_11', or 'year_12'"
+        levels = "(9, 10, 11, or 12)"
+        example_year = "year_9"
+        rest_of_the_years = "year_10, year_11, or year_12"
 
-    try:
-        model = get_model()
-    except:
-        model = "gpt-4o"
+    elif lang == "spanish":
+        years = "'3_de_la_eso', '4_de_la_eso', '1_de_bachillerato', or '2_de_bachillerato'"
+        levels = "(3º, 4º, 1º, or 2º)"
+        example_year = "3_de_la_eso"
+        rest_of_the_years = "4_de_la_eso, 1_de_bachillerato, or 2_de_bachillerato"
+
+    else:
+        years = [""]
+        levels = ""
+        example_year = ""
+        rest_of_the_years = ""
 
     response = client.chat.completions.create(
         model=model,
@@ -39,16 +49,16 @@ def get_output_seq(base64_image, client, list_ft_models: bool = False):
                         "text": (
                             "Look at the image and extract:\n"
                             "- The subjects and their grades.\n"
-                            "- The level (9, 10, 11, or 12) they correspond to.\n\n"
+                            f"- The level {levels} they correspond to.\n\n"
                             "You must return a SINGLE JSON object in the exact following format:\n\n"
                             "{\n"
-                            '  "year_9": [  # Or year_10, year_11, or year_12 as appropriate\n'
+                            f"  {example_year}: [  # Or {rest_of_the_years} as appropriate\n"
                             '    {"subject": "...", "grade": "..."},\n'
                             '    {"subject": "...", "grade": "..."}\n'
                             "  ]\n"
                             "}\n\n"
                             "DO NOT include any additional text, explanations, or comments. "
-                            "Use the key 'year_9', 'year_10', 'year_11', or 'year_12' based on what can be inferred from the image."
+                            f"Use the key {years} based on what can be inferred from the image."
                         ),
                     },
                     {
@@ -60,15 +70,13 @@ def get_output_seq(base64_image, client, list_ft_models: bool = False):
         ],
     )
 
-    grades = detect_json(str(response.choices[0]))
+    grades = detect_json(str(response.choices[0].message.content))
     grades = clean_json(grades)
 
     return grades
 
 
-def process_dataset(dataset_iterator):
-
-    client = OpenAI()
+def process_dataset(client, dataset_iterator, model, lang):
 
     evaluator = JSONParseEvaluator()
     accs = []
@@ -81,15 +89,11 @@ def process_dataset(dataset_iterator):
 
         base64_image = encode_image(image)
 
-        seq = get_output_seq(base64_image, client)
+        seq = get_output_seq(base64_image, client, model, lang)
         score = evaluator.cal_acc(seq, gt)
 
         accs.append(score)
         output_list.append(seq)
-        # print(gt)
-        # print(seq, score)
-        # print("")
-        # print(score)
 
         # if i + 1 >= SAMPLES_LIMIT:
         #     break
@@ -97,21 +101,49 @@ def process_dataset(dataset_iterator):
     return np.mean(accs)
 
 
+def get_model(client, list_ft_models: bool = False):
+
+    if list_ft_models:
+        list_fine_tunes(client)
+
+    try:
+        model = input("Paste the model to use: ")
+
+    except:
+        model = "gpt-4o"
+
+    return model
+
+
 def main():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", type=str)
+    parser.add_argument("--dataset", type=str, required=True)
+    parser.add_argument("--subset", type=str, required=True)
+    parser.add_argument("--finetuned", type=lambda x: x.lower() in ["true", "1"], default=False, required=True)
+    parser.add_argument("--language", type=str, required=True)
     args = parser.parse_args()
 
     dataset_name = args.dataset
+    subset_name = args.subset
+    finetuned = args.finetuned
+    language = args.language
 
     init_apis()
-    subsets = get_dataset_config_names(dataset_name)
+
+    client = OpenAI()
+
+    if subset_name == "all":
+        subsets = get_dataset_config_names(dataset_name)
+    else:
+        subsets = [subset_name]
+
+    model = get_model(client, finetuned)
 
     for subset_name in subsets:
         print(f"Processing {subset_name}")
         dataset_iterator = get_dataset_iterator(dataset_name, subset_name)
-        mean_acc = process_dataset(dataset_iterator)
+        mean_acc = process_dataset(client, dataset_iterator, model, language)
         print(f"Mean accuracy {subset_name}: {mean_acc}")
 
 

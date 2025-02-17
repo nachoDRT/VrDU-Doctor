@@ -5,6 +5,7 @@ from io import BytesIO
 from os.path import join, abspath, dirname
 import os
 from datasets import load_dataset, Image, get_dataset_config_names
+import re
 
 
 def encode_image(img):
@@ -54,11 +55,12 @@ def clean_json(grades: str) -> Dict:
 
     raw_json = grades.encode("utf-8").decode("unicode_escape")
     corrected_json = raw_json.encode("latin-1").decode("utf-8")
+    corrected_json = re.sub(r"'", '"', corrected_json)
 
     try:
         grades_dict = json.loads(corrected_json)
     except:
-        print(corrected_json)
+        # print(corrected_json)
         grades_dict = {}
 
     return grades_dict
@@ -72,6 +74,7 @@ def get_sample_data(sample):
     gt = gt.replace("'", '"')
     gt = json.loads(gt)
 
+    # print(f"Ground Truth: {type(gt)} {gt}")
     # gt = gt["gt_parse"]
 
     return img, gt
@@ -106,14 +109,6 @@ def save_dataset_jsonl(file_name, dataset_jsonl):
     with open(path, "w") as f:
         for item in dataset_jsonl:
             f.write(json.dumps(item) + "\n")
-
-
-def get_model():
-
-    config_path = join(dirname(dirname(abspath(__file__))), "config", "config.json")
-    config = load_config(config_path)
-
-    return config["model"]
 
 
 def list_fine_tunes(client):
