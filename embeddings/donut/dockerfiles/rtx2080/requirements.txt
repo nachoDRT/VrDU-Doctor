@@ -1,0 +1,11 @@
+debugpy
+transformers
+datasets
+sentencepiece
+pytorch-lightning
+wandb
+nltk
+matplotlib
+opencv-python-headless
+donut-python
+git-lfs

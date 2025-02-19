@@ -14,6 +14,8 @@ single/donut/dataset_inspection
 single/donut/saliencies/files
 single/chameleon/data/cached_data
 
+embeddings/donut/saliencies/files
+
 postprocess/models/*/
 !postprocess/models/*.*
 
