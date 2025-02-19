@@ -9,9 +9,12 @@ import numpy as np
 from PIL import Image
 from tqdm.auto import tqdm
 from datetime import datetime
-from datasets import load_dataset
+from datasets import load_dataset, get_dataset_config_names
 from donut import JSONParseEvaluator
 from transformers import DonutProcessor, VisionEncoderDecoderModel
+import argparse
+from huggingface_hub import HfApi, HfFolder
+from tqdm import tqdm
 
 
 SALIENCY = False
@@ -25,12 +28,13 @@ def log_info(msg: str):
     print("")
 
 
-def get_donut():
+def get_donut(subfolder: str):
     log_info("Loading Model and Processor")
 
-    model = VisionEncoderDecoderModel.from_pretrained("de-Rodrigo/donut-merit")
+    print(subfolder)
+    model = VisionEncoderDecoderModel.from_pretrained("de-Rodrigo/donut-merit", subfolder=subfolder)
 
-    processor = DonutProcessor.from_pretrained("de-Rodrigo/donut-merit")
+    processor = DonutProcessor.from_pretrained("de-Rodrigo/donut-merit", subfolder=subfolder)
 
     return model, processor
 
@@ -44,11 +48,11 @@ def resize_image(image, new_width):
     return resized_image
 
 
-def get_dataset_iterator():
+def get_dataset_iterator(dataset_name: str, subset_name: str):
     log_info("Loading Dataset")
 
     dataset = load_dataset(
-        "de-Rodrigo/merit", "en-digital-seq", split="train", streaming=True
+        dataset_name, subset_name, split="test", streaming=True
     )
     dataset_iterator = iter(dataset)
 
@@ -57,11 +61,13 @@ def get_dataset_iterator():
 
 def get_sample_data(sample):
 
-    log_info("Getting Image")
+    # log_info("Getting Image")
 
     img = sample["image"]
-    gt = json.loads(sample["ground_truth"])
-    gt = gt["gt_parse"]
+    gt = sample["ground_truth"]
+    gt = gt.replace("'", '"')
+    gt = json.loads(gt)
+    # gt = gt["gt_parse"]
 
     if SALIENCY:
         img = resize_image(img, 512)
@@ -124,14 +130,16 @@ def save_img(img, path):
 
 
 def compute_output(donut_m, donut_p, evaluator, pixels, image, gt):
-    log_info("Computing Output")
+    # log_info("Computing Output")
 
     task_prompt = "<s_cord-v2>"
     decoder_input_ids = donut_p.tokenizer(
         task_prompt, add_special_tokens=False, return_tensors="pt"
     )["input_ids"]
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    # device = "cuda" if torch.cuda.is_available() else "cpu"
+    # f***g hell, it doesn't fit on the GPU
+    device = "cpu"
     donut_m.to(device)
 
     pixels = pixels.to(device)
@@ -172,7 +180,7 @@ def process_dataset(dataset_iterator):
     accs = []
     output_list = []
 
-    for i, sample in enumerate(dataset_iterator):
+    for i, sample in tqdm(enumerate(dataset_iterator)):
 
         # Get image and ground truth
         image, gt = get_sample_data(sample)
@@ -187,24 +195,49 @@ def process_dataset(dataset_iterator):
 
         accs.append(score)
         output_list.append(output_seq)
-        log_info(f"Grades detected: {output_seq}")
+        # log_info(f"Grades detected: {output_seq}")
 
-        if i + 1 >= SAMPLES_LIMIT:
-            break
+        # if i + 1 >= SAMPLES_LIMIT:
+        #     break
 
-    log_info(f"Mean accuracy: {np.mean(accs)}")
+    return np.mean(accs)
+
+
+def init_hf_hub():
+    HfFolder.save_token(os.environ["HUGGINGFACE_HUB_TOKEN"])
 
 
 if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dataset", type=str)
+    parser.add_argument("--subset", type=str)
+    parser.add_argument("--model", type=str)
+    args = parser.parse_args()
+
+    init_hf_hub()
+
+    dataset_name = args.dataset
+    subset_name = args.subset
+    donut_model_version = args.model
+
+    if subset_name == "all":
+        subsets = get_dataset_config_names(dataset_name)
+    else:
+        subsets = [subset_name]
 
     # Project config
     logging.basicConfig(level=logging.INFO)
 
     # Load model and processor
-    model, processor = get_donut()
+    model, processor = get_donut(donut_model_version)
 
-    # Get dataset
-    dataset_iter = get_dataset_iterator()
+    for subset_name in subsets:
+        print(f"Processing {subset_name}")
 
-    # Process datset
-    process_dataset(dataset_iter)
+        # Get dataset
+        dataset_iter = get_dataset_iterator(dataset_name, subset_name)
+
+        # Process dataset
+        mean_acc = process_dataset(dataset_iter)
+        print(f"Mean accuracy {subset_name}: {mean_acc}")

@@ -430,8 +430,10 @@ if __name__ == "__main__":
     
     percentage = 0.1
     num_samples = int(len(val_dataset) * percentage)
-    sampler = SubsetRandomSampler(torch.randperm(len(val_dataset))[:num_samples])
+    indices = torch.randperm(len(val_dataset))[:num_samples].tolist()
+    sampler = SubsetRandomSampler(indices)
     val_dataloader = DataLoader(val_dataset, batch_size=1, sampler=sampler, num_workers=4)
+
 
 
     # Train
