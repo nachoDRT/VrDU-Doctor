@@ -8,9 +8,14 @@ Available cards: `RTX2080`, `RTX3090`, `RTX4090`
 docker build -f dockerfiles/your_card/Dockerfile -t donut .
 ```
 
-### Run :boom: or Debug :no_entry_sign::bug: the docker
+### Run :boom: the docker
 ```bash
 docker run -it --gpus '"device=0"' --ipc=host donut
+```
+
+### Run :boom: the docker using a volume to gather results
+```bash
+docker run -it --gpus '"device=0"' --ipc=host -v "$(pwd)/results:/app/results" donut
 ```
 
 ```bash
