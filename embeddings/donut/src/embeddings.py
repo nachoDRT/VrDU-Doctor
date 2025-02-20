@@ -1,22 +1,17 @@
-import re
 import os
 import cv2
 import json
-import torch
-import utils
 import logging
 import numpy as np
-from PIL import Image
 from tqdm.auto import tqdm
-from datetime import datetime
 from datasets import load_dataset, get_dataset_config_names
-from donut import JSONParseEvaluator
 from transformers import DonutProcessor, VisionEncoderDecoderModel
 import argparse
 from huggingface_hub import HfApi, HfFolder
 from tqdm import tqdm
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
+import csv
 
 
 RESULTS_DIR = "/app/results"
@@ -68,14 +63,19 @@ def save_img(img, path):
     cv2.imwrite(path, img)
 
 
+def get_img_info(sample):
+    return "https://docs.bokeh.org/static/snakebite.jpg"
+
 
 def get_visual_embeddings(dataset_iterator):
 
     all_embeddings = []
+    info_list = []
 
     for i, sample in tqdm(enumerate(dataset_iterator)):
         # Get image and ground truth
         image, gt = get_sample_data(sample)
+        img_info = get_img_info(sample)
 
         # Prepare image
         pixel_values = processor(image, return_tensors="pt").pixel_values
@@ -88,12 +88,69 @@ def get_visual_embeddings(dataset_iterator):
         image_embedding = image_embeddings.mean(dim=1)
         all_embeddings.append(image_embedding.squeeze(0).detach().cpu().numpy())
 
+        info_list.append(img_info)
 
-    return all_embeddings
+
+    return all_embeddings, info_list
 
 
 def init_hf_hub():
     HfFolder.save_token(os.environ["HUGGINGFACE_HUB_TOKEN"])
+
+
+def get_dataset_embeddings():
+
+    all_embeddings_global = []
+    all_labels = []
+    all_img_infos = []
+
+    for subset in subsets:
+        log_info(f"Processing {subset}")
+        dataset_iter = get_dataset_iterator(dataset_name, subset)
+        subset_embeddings, subset_img_infos = get_visual_embeddings(dataset_iter)
+        subset_embeddings = np.stack(subset_embeddings, axis=0)  # [n_imágenes, hidden_dim]
+        all_embeddings_global.append(subset_embeddings)
+        all_labels.extend([subset] * subset_embeddings.shape[0])
+        all_img_infos.extend(subset_img_infos)
+
+    all_embeddings_global = np.concatenate(all_embeddings_global, axis=0)
+
+    return all_embeddings_global, all_labels, all_img_infos
+
+
+def plot():
+    unique_subsets = np.unique(all_labels)
+    plt.figure(figsize=(8, 8))
+    colors = plt.cm.tab10(np.linspace(0, 1, len(unique_subsets)))
+
+    for idx, subset in enumerate(unique_subsets):
+        indices = [i for i, label in enumerate(all_labels) if label == subset]
+        subset_points = reduced_embeddings[indices, :]
+        plt.scatter(subset_points[:, 0], subset_points[:, 1], 
+                    color=colors[idx], label=subset, alpha=0.6)
+
+    plt.title("Clusters de Embeddings de Imagen (PCA) - Todos los Subsets")
+    plt.xlabel("Componente Principal 1")
+    plt.ylabel("Componente Principal 2")
+    plt.legend()
+
+    save_path = os.path.join(RESULTS_DIR, "clusters_all_subsets.png")
+    plt.savefig(save_path)
+    plt.close()
+
+
+def save_csv():
+    csv_path = os.path.join(RESULTS_DIR, "pca_results.csv")
+    
+    with open(csv_path, mode="w", newline="") as csv_file:
+        writer = csv.writer(csv_file)
+        writer.writerow(["x", "y", "label", "img"])
+    
+        for i in range(reduced_embeddings.shape[0]):
+            x, y = reduced_embeddings[i]
+            label = all_labels[i]
+            img_info = all_img_infos[i]
+            writer.writerow([x, y, label, img_info])
 
 
 if __name__ == "__main__":
@@ -121,42 +178,12 @@ if __name__ == "__main__":
     # Load model and processor
     model, processor = get_donut(donut_model_version)
 
-    all_embeddings_global = []
-    all_labels = []
 
-    for subset in subsets:
-        print(f"Processing {subset}")
-        dataset_iter = get_dataset_iterator(dataset_name, subset)
-        subset_embeddings = get_visual_embeddings(dataset_iter)
-        subset_embeddings = np.stack(subset_embeddings, axis=0)  # [n_imágenes, hidden_dim]
-        all_embeddings_global.append(subset_embeddings)
-        # Asignamos la etiqueta del subset a cada embedding de esa parte
-        all_labels.extend([subset] * subset_embeddings.shape[0])
+    all_embeddings_global, all_labels, all_img_infos = get_dataset_embeddings()
 
-    # Concatenamos embeddings de todos los subsets en un único array
-    all_embeddings_global = np.concatenate(all_embeddings_global, axis=0)
-
-    # Reducir la dimensionalidad a 2D usando PCA
+    # Reduce dimensionality by using PCA
     pca = PCA(n_components=2)
     reduced_embeddings = pca.fit_transform(all_embeddings_global)
 
-    # Graficar: asignamos un color distinto a cada subset
-    unique_subsets = np.unique(all_labels)
-    plt.figure(figsize=(8, 8))
-    colors = plt.cm.tab10(np.linspace(0, 1, len(unique_subsets)))  # Paleta de colores
-
-    for idx, subset in enumerate(unique_subsets):
-        # Obtenemos los índices de los embeddings correspondientes a este subset
-        indices = [i for i, label in enumerate(all_labels) if label == subset]
-        subset_points = reduced_embeddings[indices, :]
-        plt.scatter(subset_points[:, 0], subset_points[:, 1], 
-                    color=colors[idx], label=subset, alpha=0.6)
-
-    plt.title("Clusters de Embeddings de Imagen (PCA) - Todos los Subsets")
-    plt.xlabel("Componente Principal 1")
-    plt.ylabel("Componente Principal 2")
-    plt.legend()
-
-    save_path = os.path.join(RESULTS_DIR, "clusters_all_subsets.png")
-    plt.savefig(save_path)
-    plt.close()
+    plot()
+    save_csv()
