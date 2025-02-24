@@ -15,6 +15,7 @@ single/donut/saliencies/files
 single/chameleon/data/cached_data
 
 embeddings/donut/results
+embeddings/donut/config
 
 postprocess/models/*/
 !postprocess/models/*.*
