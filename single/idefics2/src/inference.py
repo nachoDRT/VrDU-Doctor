@@ -8,8 +8,15 @@ from transformers import (
     BitsAndBytesConfig,
     Idefics2ForConditionalGeneration,
 )
-from datasets import load_dataset
+from datasets import load_dataset, get_dataset_config_names
 from huggingface_hub import hf_hub_download
+import argparse
+from tqdm import tqdm
+import os
+from huggingface_hub import HfApi, HfFolder
+from donut import JSONParseEvaluator
+import numpy as np
+from peft import PeftModel
 
 
 """
@@ -20,7 +27,7 @@ https://github.com/NielsRogge/Transformers-Tutorials/tree/master/Idefics2
 
 PEFT_MODEL_ID = "de-Rodrigo/idefics2-merit"
 EMBEDDINGS_REPO = ""
-DATASET = {"name": "de-Rodrigo/merit", "subset": "en-digital-seq", "split": "train"}
+# DATASET = {"name": "de-Rodrigo/merit", "subset": "en-digital-seq", "split": "train"}
 SAMPLES_LIMIT = 2
 SALIENCY = False
 
@@ -76,8 +83,11 @@ def resize_embeddings(model, processor, repo_name):
     except Exception as e:
         log_error(f"Error when resizing embeddigns: {e}")
         log_info("Unable to load saved embeddings. Resizing embeddigns from scratch")
+        # dummy_dataset = utils.Idefics2Dataset(
+        #     processor, model, dataset_name, subset_name, "test"
+        # )
         dummy_dataset = utils.Idefics2Dataset(
-            processor, model, DATASET["name"], DATASET["subset"], DATASET["split"]
+            processor, model, "de-Rodrigo/merit", "es-render-seq", "test"
         )
 
         model_with_embeddings = dummy_dataset.get_model()
@@ -94,8 +104,8 @@ def resize_embeddings(model, processor, repo_name):
 
 def get_idefics2():
 
-    processor = AutoProcessor.from_pretrained(PEFT_MODEL_ID)
-
+    processor = AutoProcessor.from_pretrained(PEFT_MODEL_ID, subfolder=idefics_model_version)
+    # processor = AutoProcessor.from_pretrained(PEFT_MODEL_ID)
     # Define quantization config
     quantization_config = BitsAndBytesConfig(
         load_in_4bit=True,
@@ -103,22 +113,34 @@ def get_idefics2():
         bnb_4bit_compute_dtype=torch.float16,
     )
     # Load the base model with adapters on top
-    model = Idefics2ForConditionalGeneration.from_pretrained(
-        PEFT_MODEL_ID,
+    base_model = Idefics2ForConditionalGeneration.from_pretrained(
+        "HuggingFaceM4/idefics2-8b",
         torch_dtype=torch.float16,
         quantization_config=quantization_config,
     )
+    model = PeftModel.from_pretrained(
+        base_model,
+        PEFT_MODEL_ID,
+        subfolder=idefics_model_version,
+        # torch_dtype=torch.float16,
+        # quantization_config=quantization_config,
+    )
+    # model = Idefics2ForConditionalGeneration.from_pretrained(
+    #     PEFT_MODEL_ID,
+    #     torch_dtype=torch.float16,
+    #     quantization_config=quantization_config,
+    # )
 
     model, processor = resize_embeddings(model, processor, EMBEDDINGS_REPO)
 
     return model, processor
 
 
-def get_dataset_iterator():
+def get_dataset_iterator(dataset_name: str, subset_name: str):
     log_info("Loading Dataset")
 
     dataset = load_dataset(
-        DATASET["name"], DATASET["subset"], split="test", streaming=True
+        dataset_name, subset_name, split="test", streaming=True
     )
     dataset_iterator = iter(dataset)
 
@@ -151,11 +173,14 @@ def resize_image(image, new_width):
 
 def get_sample_data(sample):
 
-    log_info("Getting Image")
+    # log_info("Getting Image")
 
     img = sample["image"]
-    gt = json.loads(sample["ground_truth"])
-    gt = gt["gt_parse"]
+    # gt = json.loads(sample["ground_truth"])
+    # gt = gt["gt_parse"]
+    gt = sample["ground_truth"]
+    gt = gt.replace("'", '"')
+    gt = json.loads(gt)
 
     if SALIENCY:
         img = resize_image(img, 512)
@@ -164,8 +189,11 @@ def get_sample_data(sample):
 
 
 def process_dataset(dataset_iterator, model, processor, prompt):
+    evaluator = JSONParseEvaluator()
+    accs = []
+    output_list = []
 
-    for i, sample in enumerate(dataset_iterator):
+    for i, sample in tqdm(enumerate(dataset_iterator)):
 
         # Get image and ground truth
         image, gt = get_sample_data(sample)
@@ -183,26 +211,63 @@ def process_dataset(dataset_iterator, model, processor, prompt):
 
         # Convert to dict
         generated_json = utils.token2json(generated_texts[0], processor)
+        score = evaluator.cal_acc(generated_json, gt)
 
-        log_info(f"Grades detected: {generated_json}")
+        accs.append(score)
+        output_list.append(generated_json)
 
-        if i + 1 >= SAMPLES_LIMIT:
-            break
+        # log_info(f"Grades detected: {generated_json}")
+
+        # if i + 1 >= SAMPLES_LIMIT:
+        #     break
+
+    return np.mean(accs)
+
+
+def init_hf_hub():
+    HfFolder.save_token(os.environ["HUGGINGFACE_HUB_TOKEN"])
 
 
 if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dataset", type=str)
+    parser.add_argument("--subset", type=str)
+    parser.add_argument("--model", type=str)
+    args = parser.parse_args()
+
+    dataset_name = args.dataset
+    subset_name = args.subset
+    idefics_model_version = args.model
+
+    init_hf_hub()
+
+    if subset_name == "all":
+        subsets = get_dataset_config_names(dataset_name)
+        
+        # Just to avoid an error resizing embeddings
+        subset_name = subsets[0]
+
+    else:
+        subsets = [subset_name]
 
     # Project config
     logging.basicConfig(level=logging.INFO)
 
     # Load model and processor
     i2_model, i2_processor = get_idefics2()
-
-    # Get test dataset
-    dataset_iter = get_dataset_iterator()
-
     # Config prompt
     i2_prompt, i2_processor = config_prompt(i2_processor)
 
-    # Inference
-    process_dataset(dataset_iter, i2_model, i2_processor, i2_prompt)
+
+    for subset_name in subsets:
+        print(f"Processing {subset_name}")
+
+
+        # Get test dataset
+        dataset_iter = get_dataset_iterator(dataset_name, subset_name)
+
+        # Inference
+        mean_acc = process_dataset(dataset_iter, i2_model, i2_processor, i2_prompt)
+        
+        print(f"Mean accuracy {subset_name}: {mean_acc}")
