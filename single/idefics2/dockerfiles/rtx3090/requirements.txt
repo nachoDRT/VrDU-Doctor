@@ -8,3 +8,5 @@ wandb
 nltk
 peft
 bitsandbytes
+donut-python
+peft
