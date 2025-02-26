@@ -21,6 +21,7 @@ from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 import csv
 from os.path import join, dirname, abspath
+import debugpy
 
 
 """
@@ -218,31 +219,86 @@ def process_dataset(dataset_iterator, model, processor, prompt):
     return np.mean(accs)
 
 
-def get_visual_embeddings(dataset_iter, subset_name, model, processor, prompt):
+# def get_visual_embeddings(dataset_iter, subset_name, model, processor, prompt):
     
+#     all_embeddings = []
+#     info_urls = []
+
+#     for i, sample in tqdm(enumerate(dataset_iter)):
+#         image, _ = get_sample_data(sample)
+#         image_name = str(i).zfill(6)
+#         image_name = f"{subset_name}_{image_name}.png"
+#         img_url = compose_url(owner, repo, branch, image_name)
+
+#         # Get inputs
+#         inputs = processor(text=prompt, images=[image], return_tensors="pt").to("cuda")
+
+#         # encoder_outputs = model.get_encoder()(inputs)
+#         encoder_outputs = model.base_model.get_encoder()(inputs)
+#         # Los embeddings se encuentran en last_hidden_state
+#         image_embeddings = encoder_outputs.last_hidden_state
+
+#         # Average the embeddings across patches
+#         image_embedding = image_embeddings.mean(dim=1)
+#         all_embeddings.append(image_embedding.squeeze(0).detach().cpu().numpy())
+
+#         info_urls.append(img_url)
+
+#     return all_embeddings, info_urls 
+
+def get_visual_embeddings(dataset_iter, subset_name, model, processor, prompt):
     all_embeddings = []
     info_urls = []
-
-    for i, sample in tqdm(enumerate(dataset_iter)):
+    
+    for i, sample in enumerate(dataset_iter):
+        # Extraer imagen y otros datos del sample
         image, _ = get_sample_data(sample)
-        image_name = str(i).zfill(6)
-        image_name = f"{subset_name}_{image_name}.png"
+        image_name = f"{subset_name}_{str(i).zfill(6)}.png"
         img_url = compose_url(owner, repo, branch, image_name)
+        
+        # Preprocesar imagen y prompt
+        inputs = processor(text=prompt, images=[image], return_tensors="pt")
+        inputs = inputs.to("cuda")
+        
+        # Extraer los pixel_values y, opcionalmente, el patch_attention_mask
+        pixel_values = inputs.pixel_values  # Obtiene las imágenes preprocesadas
+        patch_attention_mask = inputs.get("patch_attention_mask", None)
+        
+        # Pasar la imagen por el módulo de visión:
+        vision_outputs = model.base_model.model.model.vision_model(
+            pixel_values=pixel_values.squeeze(1).half(),
+            patch_attention_mask=patch_attention_mask,
+            return_dict=True
+        )
+        # vision_outputs.last_hidden_state contiene los embeddings iniciales de imagen
+        
+        # Opcional: generar un patch_attention_mask si no viene
+        if patch_attention_mask is None:
+            patch_size = model.config.vision_config.patch_size
+            batch_size = pixel_values.size(0)
+            seq_len = (pixel_values.size(2) // patch_size) * (pixel_values.size(3) // patch_size)
+            patch_attention_mask = torch.ones(batch_size, seq_len, dtype=torch.bool, device=pixel_values.device)
+        
+         # vision_outputs.last_hidden_state contiene los embeddings iniciales (forma: [batch, seq_len, hidden_size])
+        image_hidden_states = vision_outputs.last_hidden_state
+        
+        # Si no tenemos máscara, creamos una máscara de unos con la longitud del contexto que produjo la visión
+        batch_size = image_hidden_states.size(0)
+        context_seq_len = image_hidden_states.size(1)
+        context_attention_mask = torch.ones(batch_size, context_seq_len, dtype=torch.bool, device=image_hidden_states.device)
 
-        # Get inputs
-        inputs = processor(text=prompt, images=[image], return_tensors="pt").to("cuda")
-
-        encoder_outputs = model.get_encoder()(inputs)
-        # Los embeddings se encuentran en last_hidden_state
-        image_embeddings = encoder_outputs.last_hidden_state
-
-        # Average the embeddings across patches
-        image_embedding = image_embeddings.mean(dim=1)
+        # Aplicar el connector para proyectar y re-muestrear las representaciones visuales
+        image_hidden_states = vision_outputs.last_hidden_state  # (batch_size, seq_len, hidden_size)
+        image_hidden_states = model.base_model.model.model.connector(image_hidden_states,
+                                                    attention_mask=context_attention_mask)
+        
+        # Pooling para obtener un vector único por imagen (por ejemplo, promedio)
+        image_embedding = image_hidden_states.mean(dim=1)
+        
         all_embeddings.append(image_embedding.squeeze(0).detach().cpu().numpy())
-
         info_urls.append(img_url)
-
-    return all_embeddings, info_urls 
+        
+    return all_embeddings, info_urls
 
 
 def init_hf_hub():
@@ -310,6 +366,7 @@ def get_dataset_embeddings():
 
     all_embeddings_global = []
     all_labels = []
+    all_img_urls = []
 
     for subset_name in subsets:
         print(f"Processing {subset_name}")
@@ -352,10 +409,17 @@ def get_repo_config():
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
+    parser.add_argument("--debug", type=str)
     parser.add_argument("--dataset", type=str)
     parser.add_argument("--subset", type=str)
     parser.add_argument("--model", type=str)
     args = parser.parse_args()
+
+    # Debug
+    if eval(args.debug):
+        debugpy.listen(("0.0.0.0", 5678))
+        print("Waiting for debugger to connect...")
+        debugpy.wait_for_client()
 
     dataset_name = args.dataset
     subset_name = args.subset
