@@ -18,9 +18,13 @@ import requests
 from io import BytesIO
 import base64
 import PIL
+from sklearn.manifold import TSNE
+import debugpy
+import re
+
 
 RESULTS_DIR = "/app/results"
-UPLOAD_IMAGES_TO_REPO = True
+UPLOAD_IMAGES_TO_REPO = False
 
 
 def log_info(msg: str):
@@ -43,7 +47,7 @@ def get_dataset_iterator(dataset_name: str, subset_name: str, decode=None):
     log_info("Loading Dataset")
 
     dataset = load_dataset(
-        dataset_name, subset_name, split="test", streaming=True
+        dataset_name, subset_name, split=split, streaming=True
     )
 
     if decode:
@@ -101,15 +105,25 @@ def get_visual_embeddings(dataset_iterator, non_decoded_dataset_iterator, subset
     info_list = []
     info_urls = []
     imgs_b64 = []
+    imgs_subset = []
 
     for i, (sample, non_decoded_sample) in tqdm(enumerate(zip(dataset_iterator, non_decoded_dataset_iterator))):
         # Get image and ground truth
         image, gt = get_sample_data(sample)
         # img_info = get_img_info(sample)
-        # image_name = get_sample_img_name(non_decoded_sample)
-        image_name = str(i).zfill(6)
-        image_name = f"{subset}_{image_name}.png"
-        img_url = compose_url(owner, repo, branch, image_name)
+        image_name = get_sample_img_name(non_decoded_sample)
+        
+        if image_name == None:
+        
+            image_name = str(i).zfill(6)
+            image_name = f"{subset}_{image_name}.png"
+            img_url = compose_url(owner, repo, branch, image_name)
+            imgs_subset.append(subset)
+        
+        # Subsets in in Merit Dataset are not ordered by school name
+        else:
+            img_url = compose_url(owner, repo, branch, image_name)
+            imgs_subset.append(image_name.split("_")[1])
 
         # Prepare image
         pixel_values = processor(image, return_tensors="pt").pixel_values
@@ -126,8 +140,11 @@ def get_visual_embeddings(dataset_iterator, non_decoded_dataset_iterator, subset
         info_urls.append(img_url)
         imgs_b64.append(encode_image(image))
 
+        if max_samples is not None and i >= max_samples:
+            break
 
-    return all_embeddings, info_list, info_urls, imgs_b64
+
+    return all_embeddings, info_list, info_urls, imgs_b64, imgs_subset
 
 
 def init_hf_hub():
@@ -148,20 +165,21 @@ def get_dataset_embeddings():
         dataset_iter = get_dataset_iterator(dataset_name, subset)
         non_decoded_dataset_iter = get_dataset_iterator(dataset_name, subset, True)
 
-        subset_embeddings, subset_img_infos, info_urls, imgs_b64 = get_visual_embeddings(dataset_iter, non_decoded_dataset_iter, subset)
+        subset_embeddings, subset_img_infos, info_urls, imgs_b64, imgs_subsets = get_visual_embeddings(dataset_iter, non_decoded_dataset_iter, subset)
         subset_embeddings = np.stack(subset_embeddings, axis=0)  # [n_imágenes, hidden_dim]
         all_embeddings_global.append(subset_embeddings)
-        all_labels.extend([subset] * subset_embeddings.shape[0])
+        # all_labels.extend([subset] * subset_embeddings.shape[0])
         all_img_infos.extend(subset_img_infos)
         all_img_urls.extend(info_urls)
         all_imgs_b64.extend(imgs_b64)
+        all_labels.extend(imgs_subsets)
 
     all_embeddings_global = np.concatenate(all_embeddings_global, axis=0)
 
     return all_embeddings_global, all_labels, all_img_infos, all_img_urls, all_imgs_b64
 
 
-def plot():
+def plot(reduced_embeddings):
     unique_subsets = np.unique(all_labels)
     plt.figure(figsize=(8, 8))
     colors = plt.cm.tab10(np.linspace(0, 1, len(unique_subsets)))
@@ -182,20 +200,25 @@ def plot():
     plt.close()
 
 
-def save_csv():
-    csv_path = os.path.join(RESULTS_DIR, "pca_results.csv")
+def save_csv(embeddings):
+
+    n_dim = embeddings.shape[1]
+    header = [f"dim_{j}" for j in range(n_dim)] + ["label", "img"]
+    
+    file_name = f"donut_{re.sub(r'[/-]', '_', dataset_name)}_{subset_name}_embeddings.csv"
+    csv_path = os.path.join(RESULTS_DIR, file_name)
     
     with open(csv_path, mode="w", newline="") as csv_file:
         writer = csv.writer(csv_file)
-        writer.writerow(["x", "y", "label", "img"])
+        writer.writerow(header)
     
-        for i in range(reduced_embeddings.shape[0]):
-            x, y = reduced_embeddings[i]
+        for i in range(embeddings.shape[0]):
+            embedding_values = list(embeddings[i])
             label = all_labels[i]
             img_info = all_img_urls[i]
-            writer.writerow([x, y, label, img_info])
-
-    return csv_path
+            writer.writerow(embedding_values + [label, img_info])
+    
+    return csv_path, file_name
 
 
 def get_repo_config():
@@ -324,10 +347,10 @@ def load_secrets(file_path: str) -> Dict:
     return secrets
 
 
-def push_csv_to_hf_space():
+def push_csv_to_hf_space(csv_path, file_name):
 
     repo_id = "de-Rodrigo/Embeddings"
-    path_in_repo = "data/data.csv"
+    path_in_repo = f"data/{file_name}"
 
     api = HfApi()
     api.upload_file(
@@ -335,24 +358,40 @@ def push_csv_to_hf_space():
         path_in_repo=path_in_repo,
         repo_id=repo_id,
         repo_type="space",
-        commit_message="Upload PCA results CSV"
+        commit_message=f"Upload {dataset_name} embeddings"
     )
 
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
+    parser.add_argument("--debug", type=str)
     parser.add_argument("--dataset", type=str)
     parser.add_argument("--subset", type=str)
+    parser.add_argument("--split", type=str)
     parser.add_argument("--model", type=str)
+    parser.add_argument("--max_samples", type=str)
     args = parser.parse_args()
+
+    # Debug
+    if eval(args.debug):
+        debugpy.listen(("0.0.0.0", 5678))
+        print("Waiting for debugger to connect...")
+        debugpy.wait_for_client()
 
     init_hf_hub()
     owner, token, repo, branch = get_repo_config()
 
     dataset_name = args.dataset
     subset_name = args.subset
+    split = args.split
     donut_model_version = args.model
+    max_samples = args.max_samples
+
+    try:
+        max_samples = int(max_samples)
+    except:
+        max_samples = None
 
     if subset_name == "all":
         subsets = get_dataset_config_names(dataset_name)
@@ -368,13 +407,21 @@ if __name__ == "__main__":
 
     all_embeddings_global, all_labels, all_img_infos, all_img_urls,  all_imgs_b64 = get_dataset_embeddings()
 
-    # Reduce dimensionality by using PCA
+    # Reduce dimensionality by using PCA or TSNE
     pca = PCA(n_components=2)
-    reduced_embeddings = pca.fit_transform(all_embeddings_global)
+    reduced_embeddings_pca = pca.fit_transform(all_embeddings_global)
+
+    tsne = TSNE(n_components=2, random_state=42, perplexity=30, learning_rate=200)
+    reduced_embeddings_tsne = tsne.fit_transform(all_embeddings_global)
+
 
     if UPLOAD_IMAGES_TO_REPO:
         upload_multiple_files_to_github(all_img_infos, all_imgs_b64)
 
-    plot()
-    csv_path = save_csv()
-    push_csv_to_hf_space()
+    # WARNING: Comparing different PCA or TSNE plots is not a good idea, but it's useful to see individaul results
+    plot(reduced_embeddings_pca)
+    plot(reduced_embeddings_tsne)
+    
+    csv_path, file_name = save_csv(all_embeddings_global)
+
+    push_csv_to_hf_space(csv_path, file_name)
