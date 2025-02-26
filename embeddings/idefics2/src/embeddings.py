@@ -22,6 +22,7 @@ import matplotlib.pyplot as plt
 import csv
 from os.path import join, dirname, abspath
 import debugpy
+import re
 
 
 """
@@ -327,25 +328,30 @@ def plot():
 
 
 def save_csv():
-    csv_path = os.path.join(RESULTS_DIR, "pca_results_idefics2.csv")
+    
+    n_dim = all_embeddings_global.shape[1]
+    header = [f"dim_{j}" for j in range(n_dim)] + ["label", "img"]
+    
+    file_name = f"idefics2_{re.sub(r'[/-]', '_', dataset_name)}_{subset_name}_embeddings.csv"
+    csv_path = os.path.join(RESULTS_DIR, file_name)
     
     with open(csv_path, mode="w", newline="") as csv_file:
         writer = csv.writer(csv_file)
-        writer.writerow(["x", "y", "label", "img"])
+        writer.writerow(header)
     
-        for i in range(reduced_embeddings.shape[0]):
-            x, y = reduced_embeddings[i]
+        for i in range(all_embeddings_global.shape[0]):
+            embedding_values = list(all_embeddings_global[i])
             label = all_labels[i]
             img_info = all_img_urls[i]
-            writer.writerow([x, y, label, img_info])
+            writer.writerow(embedding_values + [label, img_info])
 
-    return csv_path
+    return csv_path, file_name
 
 
-def push_csv_to_hf_space():
+def push_csv_to_hf_space(csv_path, file_name):
 
     repo_id = "de-Rodrigo/Embeddings"
-    path_in_repo = "data/data_idefics2.csv"
+    path_in_repo = f"data/{file_name}"
 
     api = HfApi()
     api.upload_file(
@@ -353,7 +359,7 @@ def push_csv_to_hf_space():
         path_in_repo=path_in_repo,
         repo_id=repo_id,
         repo_type="space",
-        commit_message="Upload PCA results CSV"
+        commit_message=f"Upload Idefics2 {dataset_name} results CSV"
     )
 
 
@@ -448,9 +454,9 @@ if __name__ == "__main__":
     all_embeddings_global, all_labels, all_img_urls = get_dataset_embeddings()
 
     # Reduce dimensionality by using PCA
-    pca = PCA(n_components=2)
-    reduced_embeddings = pca.fit_transform(all_embeddings_global)
+    # pca = PCA(n_components=2)
+    # reduced_embeddings = pca.fit_transform(all_embeddings_global)
 
-    plot()
-    csv_path = save_csv()
-    push_csv_to_hf_space()
+    # plot()
+    csv_path, file_name = save_csv()
+    push_csv_to_hf_space(csv_path, file_name)

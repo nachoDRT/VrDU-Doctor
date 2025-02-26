@@ -358,7 +358,7 @@ def push_csv_to_hf_space(csv_path, file_name):
         path_in_repo=path_in_repo,
         repo_id=repo_id,
         repo_type="space",
-        commit_message=f"Upload {dataset_name} embeddings"
+        commit_message=f"Upload Donut {dataset_name} embeddings"
     )
 
 
