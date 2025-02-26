@@ -16,6 +16,7 @@ single/chameleon/data/cached_data
 
 embeddings/donut/results
 embeddings/donut/config
+embeddings/idefics2/config
 
 postprocess/models/*/
 !postprocess/models/*.*
@@ -34,3 +35,5 @@ vanillas/data
 *.pyc
 
 single/idefics2/log.txt
+
+embeddings/idefics2/log.txt
