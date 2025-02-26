@@ -422,6 +422,6 @@ if __name__ == "__main__":
     plot(reduced_embeddings_pca)
     plot(reduced_embeddings_tsne)
     
-    csv_path_pca, file_name_pca = save_csv(all_embeddings_global)
+    csv_path, file_name = save_csv(all_embeddings_global)
 
-    push_csv_to_hf_space(csv_path_pca, file_name_pca)
+    push_csv_to_hf_space(csv_path, file_name)
