@@ -128,11 +128,12 @@ def get_visual_embeddings(dataset_iterator, non_decoded_dataset_iterator, subset
         
         # Subsets in in Merit Dataset are not ordered by school name
         else:
-            img_url = compose_url(owner, repo, branch, image_name)
             imgs_subset.append(image_name.split("_")[1])
             image_name = f"{subset_name}_{image_name}"
+            img_url = compose_url(owner, repo, branch, image_name)
 
         # Prepare image
+        image = image.convert("RGB")
         pixel_values = processor(image, return_tensors="pt").pixel_values
 
         encoder_outputs = model.get_encoder()(pixel_values)
