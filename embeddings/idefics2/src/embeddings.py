@@ -2,13 +2,13 @@ import json
 import utils
 import torch
 import logging
-from PIL import Image
+import PIL
 from transformers import (
     AutoProcessor,
     BitsAndBytesConfig,
     Idefics2ForConditionalGeneration,
 )
-from datasets import load_dataset, get_dataset_config_names
+from datasets import load_dataset, get_dataset_config_names, Image
 from huggingface_hub import hf_hub_download
 import argparse
 from tqdm import tqdm
@@ -140,12 +140,15 @@ def get_idefics2():
     return model, processor
 
 
-def get_dataset_iterator(dataset_name: str, subset_name: str):
+def get_dataset_iterator(dataset_name: str, subset_name: str, decode=None):
     log_info("Loading Dataset")
 
     dataset = load_dataset(
-        dataset_name, subset_name, split="test", streaming=True
+        dataset_name, subset_name, split=split, streaming=True
     )
+
+    if decode:
+        dataset = dataset.cast_column("image", Image(decode=False))
     dataset_iterator = iter(dataset)
 
     return dataset_iterator
@@ -170,7 +173,7 @@ def resize_image(image, new_width):
 
     original_width, original_height = image.size
     new_height = int((new_width / original_width) * original_height)
-    resized_image = image.resize((new_width, new_height), Image.LANCZOS)
+    resized_image = image.resize((new_width, new_height), PIL.Image.LANCZOS)
 
     return resized_image
 
@@ -247,15 +250,33 @@ def process_dataset(dataset_iterator, model, processor, prompt):
 
 #     return all_embeddings, info_urls 
 
-def get_visual_embeddings(dataset_iter, subset_name, model, processor, prompt):
+
+def get_sample_img_name(non_decoded_sample):
+    return non_decoded_sample["image"]["path"]
+
+
+def get_visual_embeddings(dataset_iter, non_decoded_dataset_iter, subset_name, model, processor, prompt):
     all_embeddings = []
     info_urls = []
-    
-    for i, sample in enumerate(dataset_iter):
+    imgs_subset = []
+
+    for i, (sample, non_decoded_sample) in tqdm(enumerate(zip(dataset_iter, non_decoded_dataset_iter))):
         # Extraer imagen y otros datos del sample
         image, _ = get_sample_data(sample)
-        image_name = f"{subset_name}_{str(i).zfill(6)}.png"
-        img_url = compose_url(owner, repo, branch, image_name)
+        image_name = get_sample_img_name(non_decoded_sample)
+        
+        if image_name == None:
+        
+            image_name = str(i).zfill(6)
+            image_name = f"{subset_name}_{image_name}.png"
+            img_url = compose_url(owner, repo, branch, image_name)
+            imgs_subset.append(subset_name)
+        
+        # Subsets in in Merit Dataset are not ordered by school name
+        else:
+            img_url = compose_url(owner, repo, branch, image_name)
+            imgs_subset.append(image_name.split("_")[1])
+
         
         # Preprocesar imagen y prompt
         inputs = processor(text=prompt, images=[image], return_tensors="pt")
@@ -298,33 +319,36 @@ def get_visual_embeddings(dataset_iter, subset_name, model, processor, prompt):
         
         all_embeddings.append(image_embedding.squeeze(0).detach().cpu().numpy())
         info_urls.append(img_url)
+
+        if max_samples is not None and i >= max_samples:
+            break
         
-    return all_embeddings, info_urls
+    return all_embeddings, info_urls, imgs_subset
 
 
 def init_hf_hub():
     HfFolder.save_token(os.environ["HUGGINGFACE_HUB_TOKEN"])
 
 
-def plot():
-    unique_subsets = np.unique(all_labels)
-    plt.figure(figsize=(8, 8))
-    colors = plt.cm.tab10(np.linspace(0, 1, len(unique_subsets)))
+# def plot():
+#     unique_subsets = np.unique(all_labels)
+#     plt.figure(figsize=(8, 8))
+#     colors = plt.cm.tab10(np.linspace(0, 1, len(unique_subsets)))
 
-    for idx, subset in enumerate(unique_subsets):
-        indices = [i for i, label in enumerate(all_labels) if label == subset]
-        subset_points = reduced_embeddings[indices, :]
-        plt.scatter(subset_points[:, 0], subset_points[:, 1], 
-                    color=colors[idx], label=subset, alpha=0.6)
+#     for idx, subset in enumerate(unique_subsets):
+#         indices = [i for i, label in enumerate(all_labels) if label == subset]
+#         subset_points = reduced_embeddings[indices, :]
+#         plt.scatter(subset_points[:, 0], subset_points[:, 1], 
+#                     color=colors[idx], label=subset, alpha=0.6)
 
-    plt.title("Clusters de Embeddings de Imagen (PCA) - Todos los Subsets")
-    plt.xlabel("Componente Principal 1")
-    plt.ylabel("Componente Principal 2")
-    plt.legend()
+#     plt.title("Clusters de Embeddings de Imagen (PCA) - Todos los Subsets")
+#     plt.xlabel("Componente Principal 1")
+#     plt.ylabel("Componente Principal 2")
+#     plt.legend()
 
-    save_path = os.path.join(RESULTS_DIR, "clusters_all_subsets.png")
-    plt.savefig(save_path)
-    plt.close()
+#     save_path = os.path.join(RESULTS_DIR, "clusters_all_subsets.png")
+#     plt.savefig(save_path)
+#     plt.close()
 
 
 def save_csv():
@@ -379,11 +403,12 @@ def get_dataset_embeddings():
 
         # Get test dataset
         dataset_iter = get_dataset_iterator(dataset_name, subset_name)
+        non_decoded_dataset_iter = get_dataset_iterator(dataset_name, subset_name, True)
 
-        subset_embeddings, info_urls = get_visual_embeddings(dataset_iter, subset_name, i2_model, i2_processor, i2_prompt)
+        subset_embeddings, info_urls, imgs_subsets = get_visual_embeddings(dataset_iter, non_decoded_dataset_iter, subset_name, i2_model, i2_processor, i2_prompt)
         subset_embeddings = np.stack(subset_embeddings, axis=0)  # [n_imágenes, hidden_dim]
         all_embeddings_global.append(subset_embeddings)
-        all_labels.extend([subset_name] * subset_embeddings.shape[0])
+        all_labels.extend(imgs_subsets)
         all_img_urls.extend(info_urls)
 
     all_embeddings_global = np.concatenate(all_embeddings_global, axis=0)
@@ -418,7 +443,9 @@ if __name__ == "__main__":
     parser.add_argument("--debug", type=str)
     parser.add_argument("--dataset", type=str)
     parser.add_argument("--subset", type=str)
+    parser.add_argument("--split", type=str)
     parser.add_argument("--model", type=str)
+    parser.add_argument("--max_samples", type=str)
     args = parser.parse_args()
 
     # Debug
@@ -429,10 +456,17 @@ if __name__ == "__main__":
 
     dataset_name = args.dataset
     subset_name = args.subset
+    split = args.split
     idefics_model_version = args.model
+    max_samples = args.max_samples
 
     init_hf_hub()
     owner, repo, branch = get_repo_config()
+
+    try:
+        max_samples = int(max_samples)
+    except:
+        max_samples = None
 
     if subset_name == "all":
         subsets = get_dataset_config_names(dataset_name)
