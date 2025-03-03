@@ -5,7 +5,7 @@ import logging
 import numpy as np
 from tqdm.auto import tqdm
 from datasets import load_dataset, get_dataset_config_names, Image
-from transformers import DonutProcessor, VisionEncoderDecoderModel
+from transformers import DonutProcessor, VisionEncoderDecoderModel, VisionEncoderDecoderConfig
 import argparse
 from huggingface_hub import HfApi, HfFolder
 from tqdm import tqdm
@@ -24,7 +24,7 @@ import re
 
 
 RESULTS_DIR = "/app/results"
-UPLOAD_IMAGES_TO_REPO = False
+UPLOAD_IMAGES_TO_REPO = True
 
 
 def log_info(msg: str):
@@ -33,12 +33,18 @@ def log_info(msg: str):
     print("")
 
 
-def get_donut(subfolder: str):
+def get_donut(version: str):
     log_info("Loading Model and Processor")
 
-    model = VisionEncoderDecoderModel.from_pretrained("de-Rodrigo/donut-merit", subfolder=subfolder)
-
-    processor = DonutProcessor.from_pretrained("de-Rodrigo/donut-merit", subfolder=subfolder)
+    if version == "vanilla":
+        
+        config = VisionEncoderDecoderConfig.from_pretrained("naver-clova-ix/donut-base")
+        model = VisionEncoderDecoderModel.from_pretrained("naver-clova-ix/donut-base", config=config)
+        processor = DonutProcessor.from_pretrained("naver-clova-ix/donut-base")
+    
+    else:
+        model = VisionEncoderDecoderModel.from_pretrained("de-Rodrigo/donut-merit", subfolder=version)
+        processor = DonutProcessor.from_pretrained("de-Rodrigo/donut-merit", subfolder=version)
 
     return model, processor
 
@@ -124,6 +130,7 @@ def get_visual_embeddings(dataset_iterator, non_decoded_dataset_iterator, subset
         else:
             img_url = compose_url(owner, repo, branch, image_name)
             imgs_subset.append(image_name.split("_")[1])
+            image_name = f"{subset_name}_{image_name}"
 
         # Prepare image
         pixel_values = processor(image, return_tensors="pt").pixel_values
@@ -163,7 +170,7 @@ def get_dataset_embeddings():
         log_info(f"Processing {subset}")
         
         dataset_iter = get_dataset_iterator(dataset_name, subset)
-        non_decoded_dataset_iter = get_dataset_iterator(dataset_name, subset, True)
+        non_decoded_dataset_iter = get_dataset_iterator(dataset_name, 'es-digital-seq', True)
 
         subset_embeddings, subset_img_infos, info_urls, imgs_b64, imgs_subsets = get_visual_embeddings(dataset_iter, non_decoded_dataset_iter, subset)
         subset_embeddings = np.stack(subset_embeddings, axis=0)  # [n_imágenes, hidden_dim]
