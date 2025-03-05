@@ -208,12 +208,12 @@ def plot(reduced_embeddings):
     plt.close()
 
 
-def save_csv(embeddings):
+def save_csv(embeddings, version: str):
 
     n_dim = embeddings.shape[1]
     header = [f"dim_{j}" for j in range(n_dim)] + ["label", "img"]
     
-    file_name = f"donut_{re.sub(r'[/-]', '_', dataset_name)}_{subset_name}_embeddings.csv"
+    file_name = f"donut_{version}_{re.sub(r'[/-]', '_', dataset_name)}_{subset_name}_embeddings.csv"
     csv_path = os.path.join(RESULTS_DIR, file_name)
     
     with open(csv_path, mode="w", newline="") as csv_file:
@@ -430,6 +430,6 @@ if __name__ == "__main__":
     plot(reduced_embeddings_pca)
     plot(reduced_embeddings_tsne)
     
-    csv_path, file_name = save_csv(all_embeddings_global)
+    csv_path, file_name = save_csv(all_embeddings_global, donut_model_version)
 
     push_csv_to_hf_space(csv_path, file_name)
