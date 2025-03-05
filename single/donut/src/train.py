@@ -16,12 +16,13 @@ from transformers import (
     VisionEncoderDecoderModel,
 )
 from typing import Any, List, Tuple
-from torch.utils.data import DataLoader, SubsetRandomSampler
+from torch.utils.data import DataLoader, SubsetRandomSampler, ConcatDataset
 from nltk import edit_distance
 from torch.utils.data import Dataset
 from pytorch_lightning.callbacks import EarlyStopping, Callback
 from pytorch_lightning.loggers import WandbLogger
 from PIL import Image
+import ast
 
 HF_CARD_FILES = ["/app/src/card/README.md", "/app/src/card/.huggingface.yaml", "/app/src/card/assets/dragon_huggingface.png"]
 
@@ -149,17 +150,21 @@ class DonutDataset(Dataset):
         self.gt_token_sequences = []
         self.added_tokens = []
         for sample in self.dataset:
-            ground_truth = json.loads(sample["ground_truth"])
-            if (
-                "gt_parses" in ground_truth
-            ):  # when multiple ground truths are available, e.g., docvqa
+            try:
+                ground_truth = json.loads(sample["ground_truth"])
+            except json.decoder.JSONDecodeError:
+                ground_truth = ast.literal_eval(sample["ground_truth"])
+
+            if "gt_parses" in ground_truth:
                 assert isinstance(ground_truth["gt_parses"], list)
                 gt_jsons = ground_truth["gt_parses"]
-            else:
-                assert "gt_parse" in ground_truth and isinstance(
-                    ground_truth["gt_parse"], dict
-                )
+            elif "gt_parse" in ground_truth and isinstance(ground_truth["gt_parse"], dict):
                 gt_jsons = [ground_truth["gt_parse"]]
+            elif isinstance(ground_truth, dict):
+                # Si el diccionario no está envuelto en una clave, lo usamos directamente
+                gt_jsons = [ground_truth]
+            else:
+                raise ValueError("El formato de ground_truth no es el esperado.")
 
             self.gt_token_sequences.append(
                 [
@@ -169,7 +174,7 @@ class DonutDataset(Dataset):
                         sort_json_key=self.sort_json_key,
                     )
                     + processor.tokenizer.eos_token
-                    for gt_json in gt_jsons  # load json from list of json
+                    for gt_json in gt_jsons
                 ]
             )
 
@@ -381,6 +386,40 @@ def load_session_datasets(dataset_name: str, subset: str = ""):
 
     return train_dataset, val_dataset
 
+
+def load_secret_dataset(dataset_name: str, subsets: list):
+    
+    train_datasets = []
+    val_datasets = []
+    
+    for subset in subsets:
+        train_ds = DonutDataset(
+            dataset_name,
+            subset=subset,
+            max_length=max_length,
+            split="test",
+            task_start_token="<s_cord-v2>",
+            prompt_end_token="<s_cord-v2>",
+            sort_json_key=False,
+        )
+        val_ds = DonutDataset(
+            dataset_name,
+            subset=subset,
+            max_length=max_length,
+            split="test",
+            task_start_token="<s_cord-v2>",
+            prompt_end_token="<s_cord-v2>",
+            sort_json_key=False,
+        )
+        train_datasets.append(train_ds)
+        val_datasets.append(val_ds)
+
+    train_dataset = ConcatDataset(train_datasets)
+    val_dataset = ConcatDataset(val_datasets)
+    
+    return train_dataset, val_dataset
+
+
 if __name__ == "__main__":
 
     # Define parsing values
@@ -401,6 +440,8 @@ if __name__ == "__main__":
     dataset_subset = args.dataset_subset
     model_output_name = "".join(["donut-", dataset.split('/')[-1]])
 
+    login(token=os.getenv("HUGGINGFACE_HUB_TOKEN"))
+
     # Load model and processor
     image_size = [1280, 960]
     max_length = 768
@@ -418,7 +459,12 @@ if __name__ == "__main__":
     processor.image_processor.size = image_size[::-1]
     processor.image_processor.do_align_long_axis = False
 
-    train_dataset, val_dataset = load_session_datasets(dataset_name=dataset, subset=dataset_subset)
+    if dataset == "de-Rodrigo/merit-secret":
+        subsets_disponibles = ['britanico', 'fomento', 'maravillas', 'mater', 'montealto', 'pilar', 'recuerdo', 'retamar', 'sanpablo', 'sanpatricio']
+        train_dataset, val_dataset = load_secret_dataset(dataset, subsets_disponibles)
+    
+    else:
+        train_dataset, val_dataset = load_session_datasets(dataset_name=dataset, subset=dataset_subset)
 
     model.config.pad_token_id = processor.tokenizer.pad_token_id
     model.config.decoder_start_token_id = processor.tokenizer.convert_tokens_to_ids(
@@ -438,7 +484,7 @@ if __name__ == "__main__":
 
     # Train
     config = {
-        "max_steps": 10000,
+        "max_steps": 20000,
         "val_check_interval": 0.5,
         "check_val_every_n_epoch": 1,
         "gradient_clip_val": 1.0,
@@ -454,7 +500,6 @@ if __name__ == "__main__":
 
     model_module = DonutModelPLModule(config, processor, model)
 
-    login(token=os.getenv("HUGGINGFACE_HUB_TOKEN"))
     wandb.login(key=os.getenv("WANDB_API_KEY"))
     wandb_logger = WandbLogger(project="Donut", name=dataset_subset)
 
@@ -473,7 +518,7 @@ if __name__ == "__main__":
         precision=16,
         num_sanity_val_steps=0,
         logger=wandb_logger,
-        callbacks=[PushToHubCallback(model_output_name, dataset_subset)],
+        callbacks=[PushToHubCallback("donut-merit", dataset_subset)],
     )
 
     trainer.fit(model_module)
