@@ -5,7 +5,7 @@ import logging
 import numpy as np
 from tqdm.auto import tqdm
 from datasets import load_dataset, get_dataset_config_names, Image
-from transformers import DonutProcessor, VisionEncoderDecoderModel
+from transformers import DonutProcessor, VisionEncoderDecoderModel, VisionEncoderDecoderConfig
 import argparse
 from huggingface_hub import HfApi, HfFolder
 from tqdm import tqdm
@@ -24,7 +24,7 @@ import re
 
 
 RESULTS_DIR = "/app/results"
-UPLOAD_IMAGES_TO_REPO = False
+UPLOAD_IMAGES_TO_REPO = True
 
 
 def log_info(msg: str):
@@ -33,12 +33,18 @@ def log_info(msg: str):
     print("")
 
 
-def get_donut(subfolder: str):
+def get_donut(version: str):
     log_info("Loading Model and Processor")
 
-    model = VisionEncoderDecoderModel.from_pretrained("de-Rodrigo/donut-merit", subfolder=subfolder)
-
-    processor = DonutProcessor.from_pretrained("de-Rodrigo/donut-merit", subfolder=subfolder)
+    if version == "vanilla":
+        
+        config = VisionEncoderDecoderConfig.from_pretrained("naver-clova-ix/donut-base")
+        model = VisionEncoderDecoderModel.from_pretrained("naver-clova-ix/donut-base", config=config)
+        processor = DonutProcessor.from_pretrained("naver-clova-ix/donut-base")
+    
+    else:
+        model = VisionEncoderDecoderModel.from_pretrained("de-Rodrigo/donut-merit", subfolder=version)
+        processor = DonutProcessor.from_pretrained("de-Rodrigo/donut-merit", subfolder=version)
 
     return model, processor
 
@@ -122,10 +128,12 @@ def get_visual_embeddings(dataset_iterator, non_decoded_dataset_iterator, subset
         
         # Subsets in in Merit Dataset are not ordered by school name
         else:
-            img_url = compose_url(owner, repo, branch, image_name)
             imgs_subset.append(image_name.split("_")[1])
+            image_name = f"{subset_name}_{image_name}"
+            img_url = compose_url(owner, repo, branch, image_name)
 
         # Prepare image
+        image = image.convert("RGB")
         pixel_values = processor(image, return_tensors="pt").pixel_values
 
         encoder_outputs = model.get_encoder()(pixel_values)
@@ -163,7 +171,7 @@ def get_dataset_embeddings():
         log_info(f"Processing {subset}")
         
         dataset_iter = get_dataset_iterator(dataset_name, subset)
-        non_decoded_dataset_iter = get_dataset_iterator(dataset_name, subset, True)
+        non_decoded_dataset_iter = get_dataset_iterator(dataset_name, 'es-digital-seq', True)
 
         subset_embeddings, subset_img_infos, info_urls, imgs_b64, imgs_subsets = get_visual_embeddings(dataset_iter, non_decoded_dataset_iter, subset)
         subset_embeddings = np.stack(subset_embeddings, axis=0)  # [n_imágenes, hidden_dim]
@@ -200,12 +208,12 @@ def plot(reduced_embeddings):
     plt.close()
 
 
-def save_csv(embeddings):
+def save_csv(embeddings, version: str):
 
     n_dim = embeddings.shape[1]
     header = [f"dim_{j}" for j in range(n_dim)] + ["label", "img"]
     
-    file_name = f"donut_{re.sub(r'[/-]', '_', dataset_name)}_{subset_name}_embeddings.csv"
+    file_name = f"donut_{version}_{re.sub(r'[/-]', '_', dataset_name)}_{subset_name}_embeddings.csv"
     csv_path = os.path.join(RESULTS_DIR, file_name)
     
     with open(csv_path, mode="w", newline="") as csv_file:
@@ -422,6 +430,6 @@ if __name__ == "__main__":
     plot(reduced_embeddings_pca)
     plot(reduced_embeddings_tsne)
     
-    csv_path, file_name = save_csv(all_embeddings_global)
+    csv_path, file_name = save_csv(all_embeddings_global, donut_model_version)
 
     push_csv_to_hf_space(csv_path, file_name)

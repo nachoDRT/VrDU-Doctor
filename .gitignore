@@ -37,3 +37,4 @@ vanillas/data
 single/idefics2/log.txt
 
 embeddings/idefics2/log.txt
+embeddings/idefics2/config/secrets.json
