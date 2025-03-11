@@ -21,10 +21,11 @@ import PIL
 from sklearn.manifold import TSNE
 import debugpy
 import re
+import pandas as pd
 
 
 RESULTS_DIR = "/app/results"
-UPLOAD_IMAGES_TO_REPO = True
+UPLOAD_IMAGES_TO_REPO = False
 
 
 def log_info(msg: str):
@@ -105,6 +106,47 @@ def encode_image(img):
     return base64.b64encode(img_bytes).decode("utf-8")
 
 
+def check_embeddings(patch_emb, mean_emb, i):
+
+    # Extract external data
+    ext_columns = [col for col in embeddings_external.columns if col.startswith("dim_")]
+    ext_embeddings = embeddings_external[ext_columns].to_numpy()  # shape: (n_ext, hidden_dim)
+
+    # Numpy-ready
+    patch_emb_np = patch_emb.squeeze(0).detach().cpu().numpy()
+    mean_emb_np = mean_emb.squeeze(0).detach().cpu().numpy().reshape(1, -1)
+
+    # Cobine data: external data, img embeddings, and mean value for img embeddings
+    combined_embeddings = np.concatenate([ext_embeddings, patch_emb_np, mean_emb_np], axis=0)
+
+    # Compute TSNE
+    tsne = TSNE(n_components=2, random_state=42, perplexity=30, learning_rate=200)
+    tsne_result = tsne.fit_transform(combined_embeddings)
+
+    # Separate data
+    n_ext = ext_embeddings.shape[0]
+    n_patch = patch_emb_np.shape[0]
+    # Mean value
+    coords_ext = tsne_result[:n_ext]
+    coords_patch = tsne_result[n_ext:n_ext+n_patch]
+    coords_mean = tsne_result[n_ext+n_patch:]
+
+    # Plot
+    plt.figure(figsize=(8, 8))
+    plt.scatter(coords_ext[:, 0], coords_ext[:, 1], c='red', label='Embeddings Real', alpha=0.6)
+    plt.scatter(coords_patch[:, 0], coords_patch[:, 1], c='blue', label='Embeddings Sample', alpha=0.6)
+    plt.scatter(coords_mean[:, 0], coords_mean[:, 1], c='black', marker='x', s=100, label='Mean Value')
+    plt.title(f"TSNE para Imagen {i}")
+    plt.xlabel("Dimensión 1")
+    plt.ylabel("Dimensión 2")
+    plt.legend()
+
+    # Save plot
+    save_path = os.path.join(RESULTS_DIR, f"tsne_image_{i}.png")
+    plt.savefig(save_path)
+    plt.close()
+
+
 def get_visual_embeddings(dataset_iterator, non_decoded_dataset_iterator, subset):
 
     all_embeddings = []
@@ -140,6 +182,10 @@ def get_visual_embeddings(dataset_iterator, non_decoded_dataset_iterator, subset
         # Los embeddings se encuentran en last_hidden_state
         image_embeddings = encoder_outputs.last_hidden_state
 
+        if check_img_embeddings:
+            check_embeddings(patch_emb=image_embeddings, mean_emb=image_embeddings.mean(dim=1), i=image_name)
+            save_non_reduced_embeddings_csv(image_embeddings.squeeze(0).detach().cpu().numpy(), donut_model_version, image_name, subset, img_url)
+
         # Average the embeddings across patches
         image_embedding = image_embeddings.mean(dim=1)
         all_embeddings.append(image_embedding.squeeze(0).detach().cpu().numpy())
@@ -171,7 +217,7 @@ def get_dataset_embeddings():
         log_info(f"Processing {subset}")
         
         dataset_iter = get_dataset_iterator(dataset_name, subset)
-        non_decoded_dataset_iter = get_dataset_iterator(dataset_name, 'es-digital-seq', True)
+        non_decoded_dataset_iter = get_dataset_iterator(dataset_name, subset, True)
 
         subset_embeddings, subset_img_infos, info_urls, imgs_b64, imgs_subsets = get_visual_embeddings(dataset_iter, non_decoded_dataset_iter, subset)
         subset_embeddings = np.stack(subset_embeddings, axis=0)  # [n_imágenes, hidden_dim]
@@ -208,12 +254,32 @@ def plot(reduced_embeddings):
     plt.close()
 
 
+def save_non_reduced_embeddings_csv(embeddings, version: str, img_name: str, img_label: str, img_url: str):
+    n_dim = embeddings.shape[1]
+    header = [f"dim_{j}" for j in range(n_dim)] + ["label", "img"]
+    
+    file_name = f"raw_embeddings_donut_finetuned_{version}_{re.sub(r'[/-]', '_', dataset_name)}_{subset_name}_{img_name}_embeddings.csv"
+    csv_path = os.path.join(RESULTS_DIR, file_name)
+    
+    with open(csv_path, mode="w", newline="") as csv_file:
+        writer = csv.writer(csv_file)
+        writer.writerow(header)
+    
+        for i in range(embeddings.shape[0]):
+            embedding_values = list(embeddings[i])
+            label = img_label
+            img_info = img_url
+            writer.writerow(embedding_values + [label, img_info])
+    
+    return csv_path, file_name
+
+
 def save_csv(embeddings, version: str):
 
     n_dim = embeddings.shape[1]
     header = [f"dim_{j}" for j in range(n_dim)] + ["label", "img"]
     
-    file_name = f"donut_{version}_{re.sub(r'[/-]', '_', dataset_name)}_{subset_name}_embeddings.csv"
+    file_name = f"donut_finetuned_{version}_{re.sub(r'[/-]', '_', dataset_name)}_{subset_name}_embeddings.csv"
     csv_path = os.path.join(RESULTS_DIR, file_name)
     
     with open(csv_path, mode="w", newline="") as csv_file:
@@ -370,6 +436,13 @@ def push_csv_to_hf_space(csv_path, file_name):
     )
 
 
+def load_external_embbedings_data():
+    
+    df_real = pd.read_csv(f"/app/embeddings/donut_vanilla_de_Rodrigo_merit_secret_all_embeddings.csv")
+
+    return df_real
+
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
@@ -379,6 +452,7 @@ if __name__ == "__main__":
     parser.add_argument("--split", type=str)
     parser.add_argument("--model", type=str)
     parser.add_argument("--max_samples", type=str)
+    parser.add_argument("--check_img_embeddings", action="store_true", help="Show embeddings dispersion per image, not just a single value")
     args = parser.parse_args()
 
     # Debug
@@ -386,6 +460,8 @@ if __name__ == "__main__":
         debugpy.listen(("0.0.0.0", 5678))
         print("Waiting for debugger to connect...")
         debugpy.wait_for_client()
+
+    embeddings_external = load_external_embbedings_data()
 
     init_hf_hub()
     owner, token, repo, branch = get_repo_config()
@@ -395,6 +471,7 @@ if __name__ == "__main__":
     split = args.split
     donut_model_version = args.model
     max_samples = args.max_samples
+    check_img_embeddings = args.check_img_embeddings
 
     try:
         max_samples = int(max_samples)
@@ -432,4 +509,4 @@ if __name__ == "__main__":
     
     csv_path, file_name = save_csv(all_embeddings_global, donut_model_version)
 
-    push_csv_to_hf_space(csv_path, file_name)
+    # push_csv_to_hf_space(csv_path, file_name)
