@@ -183,8 +183,8 @@ def get_visual_embeddings(dataset_iterator, non_decoded_dataset_iterator, subset
         image_embeddings = encoder_outputs.last_hidden_state
 
         if check_img_embeddings:
-            check_embeddings(patch_emb=image_embeddings, mean_emb=image_embeddings.mean(dim=1), i=image_name)
-            save_non_reduced_embeddings_csv(image_embeddings.squeeze(0).detach().cpu().numpy(), donut_model_version, image_name, subset, img_url)
+            check_embeddings(patch_emb=image_embeddings, mean_emb=image_embeddings.mean(dim=1), i=image_name.split(".")[0])
+            save_non_reduced_embeddings_csv(image_embeddings.squeeze(0).detach().cpu().numpy(), donut_model_version, image_name.split(".")[0], subset, img_url)
 
         # Average the embeddings across patches
         image_embedding = image_embeddings.mean(dim=1)
