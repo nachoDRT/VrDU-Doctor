@@ -2,8 +2,9 @@ chmod +x src/embeddings.py
 
 python src/embeddings.py \
     --debug True \
-    --dataset de-Rodrigo/merit \
-    --subset  es-digital-line-degradation-seq \
-    --split train \
+    --dataset de-Rodrigo/merit-secret \
+    --subset  all \
+    --split test \
     --model vanilla \
-    --max_samples 150
+    --max_samples 150 \
+    --check_img_embeddings
