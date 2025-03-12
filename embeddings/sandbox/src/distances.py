@@ -13,7 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-TARGET_DATASETS = ["es-render-seq", "es-digital-seq"]
+TARGET_DATASETS = ["es-digital-seq", "es-render-seq"]
 
 
 def load_csv(csv_path: str):
@@ -49,6 +49,19 @@ def load_target_dataset(target_dataset: str):
     except FileNotFoundError:
         print(f"Dataset {target_dataset} not found at {root}")
         return None
+    
+
+def get_target_dataset_paths(target_dataset: str):
+    
+    root = join(dirname(dirname(abspath(__file__))), model, target_dataset)
+
+    try:
+        csv_paths = [join(root, csv) for csv in listdir(root) if csv.endswith(".csv")]
+        return csv_paths
+    
+    except FileNotFoundError:
+        print(f"Dataset {target_dataset} not found at {root}")
+        return None
 
 
 def main():
@@ -60,14 +73,16 @@ def main():
 
     for target_dataset in TARGET_DATASETS:
         
-        target_dataset_data = load_target_dataset(target_dataset)
+        # target_dataset_data = load_target_dataset(target_dataset)
+        target_dataset_paths = get_target_dataset_paths(target_dataset)
 
-        if target_dataset_data:
+        if target_dataset_paths:
             distances_list = []
 
             print(f"Computing distances between {target_dataset} and real datasets")
-            for img_embeddings in tqdm(target_dataset_data):
-
+            for target_dataset_sample_path in tqdm(target_dataset_paths):
+                
+                img_embeddings = load_csv(target_dataset_sample_path)
                 synthetic_embeddings = img_embeddings.to_numpy().reshape(1, -1)
                 real_embeddings = np.vstack([df.to_numpy() for df in real_dataset_data]).reshape(152, -1)
                 distances = cosine_distances(synthetic_embeddings, real_embeddings)
