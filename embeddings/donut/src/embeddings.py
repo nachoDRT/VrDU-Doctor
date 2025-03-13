@@ -22,6 +22,7 @@ from sklearn.manifold import TSNE
 import debugpy
 import re
 import pandas as pd
+from torch.nn.functional import softmax
 
 
 RESULTS_DIR = "/app/results"
@@ -178,16 +179,61 @@ def get_visual_embeddings(dataset_iterator, non_decoded_dataset_iterator, subset
         image = image.convert("RGB")
         pixel_values = processor(image, return_tensors="pt").pixel_values
 
-        encoder_outputs = model.get_encoder()(pixel_values)
-        # Los embeddings se encuentran en last_hidden_state
+        encoder_outputs = model.get_encoder()(pixel_values, output_attentions=True)
+        # Embeddings are in last hidden state
+        # image_embeddings.shape -> torch.Size([1, 4800, 1024])
         image_embeddings = encoder_outputs.last_hidden_state
 
         if check_img_embeddings:
             check_embeddings(patch_emb=image_embeddings, mean_emb=image_embeddings.mean(dim=1), i=image_name.split(".")[0])
             save_non_reduced_embeddings_csv(image_embeddings.squeeze(0).detach().cpu().numpy(), donut_model_version, image_name.split(".")[0], subset, img_url)
 
-        # Average the embeddings across patches
-        image_embedding = image_embeddings.mean(dim=1)
+        """ 
+        LEGEND:
+        48 is the number of windows (patches aggrupations)
+        32 is the number of heads in the attention mechanism
+        100 is the sequence length
+        """
+
+        # Attention map from last layer
+        # last_attention.shape -> (torch.Size([48, 32, 100, 100])):
+        last_attention = encoder_outputs.attentions[-1]
+
+        if embedding_computation == "weighted":
+            # Average the attention heads
+            # avg_attention.shape -> torch.Size([48, 100, 100])
+            avg_attention = last_attention.mean(dim=1)
+
+            # Extract the attention values for the [CLS] token + Normalization
+            # weights.shape -> torch.Size([48, 100])
+            weights = avg_attention[:, 0, :]
+            weights = softmax(weights, dim=-1)
+
+
+
+            # We need to flatten weights to a shape that aligns with the 4800 tokens.
+            # Flatten weights to get shape: torch.Size([4800])
+            weights_flat = weights.view(-1)  # Resulting shape: torch.Size([4800])
+
+            # To perform element-wise multiplication with image_embeddings of shape [1, 4800, 1024],
+            # we expand weights_flat to shape: torch.Size([1, 4800, 1])
+            weights_expanded = weights_flat.unsqueeze(0).unsqueeze(-1)  # Resulting shape: torch.Size([1, 4800, 1])
+
+            # Now perform element-wise multiplication:
+            # image_embeddings: torch.Size([1, 4800, 1024])
+            # weights_expanded : torch.Size([1, 4800, 1])
+            # The result, weighted_embeddings, will have shape: torch.Size([1, 4800, 1024])
+            weighted_embeddings = image_embeddings * weights_expanded
+
+            # To obtain a single global weighted embedding per image,
+            # we sum over the tokens dimension (dim=1):
+            # weighted_embeddings.sum(dim=1) yields a tensor with shape: torch.Size([1, 1024])
+            image_embedding = weighted_embeddings.sum(dim=1)
+
+        else:
+            # Average the embeddings across patches
+            image_embedding = image_embeddings.mean(dim=1)
+        
         all_embeddings.append(image_embedding.squeeze(0).detach().cpu().numpy())
 
         info_list.append(f"data/{image_name}")
@@ -279,7 +325,7 @@ def save_csv(embeddings, version: str):
     n_dim = embeddings.shape[1]
     header = [f"dim_{j}" for j in range(n_dim)] + ["label", "img"]
     
-    file_name = f"donut_finetuned_{version}_{re.sub(r'[/-]', '_', dataset_name)}_{subset_name}_embeddings.csv"
+    file_name = f"donut_{version}_{re.sub(r'[/-]', '_', dataset_name)}_{subset_name}_{embedding_computation}_embeddings.csv"
     csv_path = os.path.join(RESULTS_DIR, file_name)
     
     with open(csv_path, mode="w", newline="") as csv_file:
@@ -452,6 +498,7 @@ if __name__ == "__main__":
     parser.add_argument("--split", type=str)
     parser.add_argument("--model", type=str)
     parser.add_argument("--max_samples", type=str)
+    parser.add_argument("--embedding_computation", type=str)
     parser.add_argument("--check_img_embeddings", action="store_true", help="Show embeddings dispersion per image, not just a single value")
     args = parser.parse_args()
 
@@ -472,6 +519,7 @@ if __name__ == "__main__":
     donut_model_version = args.model
     max_samples = args.max_samples
     check_img_embeddings = args.check_img_embeddings
+    embedding_computation = args.embedding_computation
 
     try:
         max_samples = int(max_samples)
@@ -509,4 +557,4 @@ if __name__ == "__main__":
     
     csv_path, file_name = save_csv(all_embeddings_global, donut_model_version)
 
-    # push_csv_to_hf_space(csv_path, file_name)
+    push_csv_to_hf_space(csv_path, file_name)
