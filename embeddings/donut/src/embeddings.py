@@ -107,7 +107,7 @@ def encode_image(img):
     return base64.b64encode(img_bytes).decode("utf-8")
 
 
-def check_embeddings(patch_emb, mean_emb, i):
+def check_embeddings(patch_emb, mean_emb, i, tag):
 
     # Extract external data
     ext_columns = [col for col in embeddings_external.columns if col.startswith("dim_")]
@@ -143,7 +143,7 @@ def check_embeddings(patch_emb, mean_emb, i):
     plt.legend()
 
     # Save plot
-    save_path = os.path.join(RESULTS_DIR, f"tsne_image_{i}.png")
+    save_path = os.path.join(RESULTS_DIR, f"tsne_image_{i}_{tag}.png")
     plt.savefig(save_path)
     plt.close()
 
@@ -184,9 +184,6 @@ def get_visual_embeddings(dataset_iterator, non_decoded_dataset_iterator, subset
         # image_embeddings.shape -> torch.Size([1, 4800, 1024])
         image_embeddings = encoder_outputs.last_hidden_state
 
-        if check_img_embeddings:
-            check_embeddings(patch_emb=image_embeddings, mean_emb=image_embeddings.mean(dim=1), i=image_name.split(".")[0])
-            save_non_reduced_embeddings_csv(image_embeddings.squeeze(0).detach().cpu().numpy(), donut_model_version, image_name.split(".")[0], subset, img_url)
 
         """ 
         LEGEND:
@@ -207,23 +204,32 @@ def get_visual_embeddings(dataset_iterator, non_decoded_dataset_iterator, subset
             # Extract the attention values for the [CLS] token + Normalization
             # weights.shape -> torch.Size([48, 100])
             weights = avg_attention[:, 0, :]
-            weights = softmax(weights, dim=-1)
-
-
 
             # We need to flatten weights to a shape that aligns with the 4800 tokens.
             # Flatten weights to get shape: torch.Size([4800])
-            weights_flat = weights.view(-1)  # Resulting shape: torch.Size([4800])
+            # weights_flat = weights.view(-1)  # Resulting shape: torch.Size([4800])
 
             # To perform element-wise multiplication with image_embeddings of shape [1, 4800, 1024],
             # we expand weights_flat to shape: torch.Size([1, 4800, 1])
-            weights_expanded = weights_flat.unsqueeze(0).unsqueeze(-1)  # Resulting shape: torch.Size([1, 4800, 1])
+            # weights_expanded = weights_flat.unsqueeze(0).unsqueeze(-1)  # Resulting shape: torch.Size([1, 4800, 1])
 
             # Now perform element-wise multiplication:
             # image_embeddings: torch.Size([1, 4800, 1024])
             # weights_expanded : torch.Size([1, 4800, 1])
             # The result, weighted_embeddings, will have shape: torch.Size([1, 4800, 1024])
-            weighted_embeddings = image_embeddings * weights_expanded
+            # weighted_embeddings = image_embeddings * weights_expanded
+
+            if check_img_embeddings:
+
+                for factor in np.arange(0.05, 1.0, 0.05):
+                    weights = weights/factor
+                    weights = softmax(weights, dim=-1)
+                    weights_flat = weights.view(-1)
+                    weights_expanded = weights_flat.unsqueeze(0).unsqueeze(-1)
+                    weighted_embeddings = image_embeddings * weights_expanded
+                    # check_embeddings(patch_emb=image_embeddings, mean_emb=image_embeddings.mean(dim=1), i=image_name.split(".")[0], tag="raw_embedding")
+                    check_embeddings(patch_emb=weighted_embeddings, mean_emb=weighted_embeddings.mean(dim=1), i=image_name.split(".")[0], tag=f"weighted_factor{factor}_embedding")
+                    # save_non_reduced_embeddings_csv(image_embeddings.squeeze(0).detach().cpu().numpy(), donut_model_version, image_name.split(".")[0], subset, img_url)
 
             # To obtain a single global weighted embedding per image,
             # we sum over the tokens dimension (dim=1):
@@ -325,7 +331,11 @@ def save_csv(embeddings, version: str):
     n_dim = embeddings.shape[1]
     header = [f"dim_{j}" for j in range(n_dim)] + ["label", "img"]
     
-    file_name = f"donut_{version}_{re.sub(r'[/-]', '_', dataset_name)}_{subset_name}_{embedding_computation}_embeddings.csv"
+    if embedding_computation == "weighted":
+        file_name = f"donut_{version}_{re.sub(r'[/-]', '_', dataset_name)}_{subset_name}_{embedding_computation}_{weight_strength}_embeddings.csv"
+    else:
+        file_name = f"donut_{version}_{re.sub(r'[/-]', '_', dataset_name)}_{subset_name}_{embedding_computation}_embeddings.csv"
+
     csv_path = os.path.join(RESULTS_DIR, file_name)
     
     with open(csv_path, mode="w", newline="") as csv_file:
@@ -499,6 +509,7 @@ if __name__ == "__main__":
     parser.add_argument("--model", type=str)
     parser.add_argument("--max_samples", type=str)
     parser.add_argument("--embedding_computation", type=str)
+    parser.add_argument("--weight_strength", type=float)
     parser.add_argument("--check_img_embeddings", action="store_true", help="Show embeddings dispersion per image, not just a single value")
     args = parser.parse_args()
 
@@ -519,6 +530,7 @@ if __name__ == "__main__":
     donut_model_version = args.model
     max_samples = args.max_samples
     check_img_embeddings = args.check_img_embeddings
+    weight_strength = args.weight_strength
     embedding_computation = args.embedding_computation
 
     try:
@@ -541,19 +553,19 @@ if __name__ == "__main__":
     all_embeddings_global, all_labels, all_img_infos, all_img_urls,  all_imgs_b64 = get_dataset_embeddings()
 
     # Reduce dimensionality by using PCA or TSNE
-    pca = PCA(n_components=2)
-    reduced_embeddings_pca = pca.fit_transform(all_embeddings_global)
+    # pca = PCA(n_components=2)
+    # reduced_embeddings_pca = pca.fit_transform(all_embeddings_global)
 
-    tsne = TSNE(n_components=2, random_state=42, perplexity=30, learning_rate=200)
-    reduced_embeddings_tsne = tsne.fit_transform(all_embeddings_global)
+    # tsne = TSNE(n_components=2, random_state=42, perplexity=30, learning_rate=200)
+    # reduced_embeddings_tsne = tsne.fit_transform(all_embeddings_global)
 
 
     if UPLOAD_IMAGES_TO_REPO:
         upload_multiple_files_to_github(all_img_infos, all_imgs_b64)
 
     # WARNING: Comparing different PCA or TSNE plots is not a good idea, but it's useful to see individaul results
-    plot(reduced_embeddings_pca)
-    plot(reduced_embeddings_tsne)
+    # plot(reduced_embeddings_pca)
+    # plot(reduced_embeddings_tsne)
     
     csv_path, file_name = save_csv(all_embeddings_global, donut_model_version)
 

@@ -39,4 +39,4 @@ single/idefics2/log.txt
 embeddings/idefics2/log.txt
 embeddings/idefics2/config/secrets.json
 embeddings/sandbox/donut
-embeddings/aux-datasets/data/IIT-CDIP
+embeddings/aux-datasets/IIT-CDIP
