@@ -26,7 +26,7 @@ from torch.nn.functional import softmax
 
 
 RESULTS_DIR = "/app/results"
-UPLOAD_IMAGES_TO_REPO = False
+UPLOAD_IMAGES_TO_REPO = True
 
 
 def log_info(msg: str):
@@ -39,11 +39,11 @@ def get_donut(version: str):
     log_info("Loading Model and Processor")
 
     if version == "vanilla":
-        
+
         config = VisionEncoderDecoderConfig.from_pretrained("naver-clova-ix/donut-base")
         model = VisionEncoderDecoderModel.from_pretrained("naver-clova-ix/donut-base", config=config)
         processor = DonutProcessor.from_pretrained("naver-clova-ix/donut-base")
-    
+
     else:
         model = VisionEncoderDecoderModel.from_pretrained("de-Rodrigo/donut-merit", subfolder=version)
         processor = DonutProcessor.from_pretrained("de-Rodrigo/donut-merit", subfolder=version)
@@ -54,9 +54,7 @@ def get_donut(version: str):
 def get_dataset_iterator(dataset_name: str, subset_name: str, decode=None):
     log_info("Loading Dataset")
 
-    dataset = load_dataset(
-        dataset_name, subset_name, split=split, streaming=True
-    )
+    dataset = load_dataset(dataset_name, subset_name, split=split, streaming=True)
 
     if decode:
         dataset = dataset.cast_column("image", Image(decode=False))
@@ -74,7 +72,6 @@ def get_sample_data(sample):
     # gt = gt["gt_parse"]
 
     return img, gt
-
 
 
 def save_img(img, path):
@@ -129,14 +126,14 @@ def check_embeddings(patch_emb, mean_emb, i, tag):
     n_patch = patch_emb_np.shape[0]
     # Mean value
     coords_ext = tsne_result[:n_ext]
-    coords_patch = tsne_result[n_ext:n_ext+n_patch]
-    coords_mean = tsne_result[n_ext+n_patch:]
+    coords_patch = tsne_result[n_ext : n_ext + n_patch]
+    coords_mean = tsne_result[n_ext + n_patch :]
 
     # Plot
     plt.figure(figsize=(8, 8))
-    plt.scatter(coords_ext[:, 0], coords_ext[:, 1], c='red', label='Embeddings Real', alpha=0.6)
-    plt.scatter(coords_patch[:, 0], coords_patch[:, 1], c='blue', label='Embeddings Sample', alpha=0.6)
-    plt.scatter(coords_mean[:, 0], coords_mean[:, 1], c='black', marker='x', s=100, label='Mean Value')
+    plt.scatter(coords_ext[:, 0], coords_ext[:, 1], c="red", label="Embeddings Real", alpha=0.6)
+    plt.scatter(coords_patch[:, 0], coords_patch[:, 1], c="blue", label="Embeddings Sample", alpha=0.6)
+    plt.scatter(coords_mean[:, 0], coords_mean[:, 1], c="black", marker="x", s=100, label="Mean Value")
     plt.title(f"TSNE para Imagen {i}")
     plt.xlabel("Dimensión 1")
     plt.ylabel("Dimensión 2")
@@ -161,14 +158,14 @@ def get_visual_embeddings(dataset_iterator, non_decoded_dataset_iterator, subset
         image, gt = get_sample_data(sample)
         # img_info = get_img_info(sample)
         image_name = get_sample_img_name(non_decoded_sample)
-        
+
         if image_name == None:
-        
+
             image_name = str(i).zfill(6)
             image_name = f"{subset}_{image_name}.png"
             img_url = compose_url(owner, repo, branch, image_name)
             imgs_subset.append(subset)
-        
+
         # Subsets in in Merit Dataset are not ordered by school name
         else:
             imgs_subset.append(image_name.split("_")[1])
@@ -183,7 +180,6 @@ def get_visual_embeddings(dataset_iterator, non_decoded_dataset_iterator, subset
         # Embeddings are in last hidden state
         # image_embeddings.shape -> torch.Size([1, 4800, 1024])
         image_embeddings = encoder_outputs.last_hidden_state
-
 
         """ 
         LEGEND:
@@ -207,28 +203,33 @@ def get_visual_embeddings(dataset_iterator, non_decoded_dataset_iterator, subset
 
             # We need to flatten weights to a shape that aligns with the 4800 tokens.
             # Flatten weights to get shape: torch.Size([4800])
-            # weights_flat = weights.view(-1)  # Resulting shape: torch.Size([4800])
+            weights_flat = weights.view(-1)  # Resulting shape: torch.Size([4800])
 
             # To perform element-wise multiplication with image_embeddings of shape [1, 4800, 1024],
             # we expand weights_flat to shape: torch.Size([1, 4800, 1])
-            # weights_expanded = weights_flat.unsqueeze(0).unsqueeze(-1)  # Resulting shape: torch.Size([1, 4800, 1])
+            weights_expanded = weights_flat.unsqueeze(0).unsqueeze(-1)  # Resulting shape: torch.Size([1, 4800, 1])
 
             # Now perform element-wise multiplication:
             # image_embeddings: torch.Size([1, 4800, 1024])
             # weights_expanded : torch.Size([1, 4800, 1])
             # The result, weighted_embeddings, will have shape: torch.Size([1, 4800, 1024])
-            # weighted_embeddings = image_embeddings * weights_expanded
+            weighted_embeddings = image_embeddings * weights_expanded
 
             if check_img_embeddings:
 
                 for factor in np.arange(0.05, 1.0, 0.05):
-                    weights = weights/factor
+                    weights = weights / factor
                     weights = softmax(weights, dim=-1)
                     weights_flat = weights.view(-1)
                     weights_expanded = weights_flat.unsqueeze(0).unsqueeze(-1)
                     weighted_embeddings = image_embeddings * weights_expanded
                     # check_embeddings(patch_emb=image_embeddings, mean_emb=image_embeddings.mean(dim=1), i=image_name.split(".")[0], tag="raw_embedding")
-                    check_embeddings(patch_emb=weighted_embeddings, mean_emb=weighted_embeddings.mean(dim=1), i=image_name.split(".")[0], tag=f"weighted_factor{factor}_embedding")
+                    check_embeddings(
+                        patch_emb=weighted_embeddings,
+                        mean_emb=weighted_embeddings.mean(dim=1),
+                        i=image_name.split(".")[0],
+                        tag=f"weighted_factor{factor}_embedding",
+                    )
                     # save_non_reduced_embeddings_csv(image_embeddings.squeeze(0).detach().cpu().numpy(), donut_model_version, image_name.split(".")[0], subset, img_url)
 
             # To obtain a single global weighted embedding per image,
@@ -239,7 +240,7 @@ def get_visual_embeddings(dataset_iterator, non_decoded_dataset_iterator, subset
         else:
             # Average the embeddings across patches
             image_embedding = image_embeddings.mean(dim=1)
-        
+
         all_embeddings.append(image_embedding.squeeze(0).detach().cpu().numpy())
 
         info_list.append(f"data/{image_name}")
@@ -248,7 +249,6 @@ def get_visual_embeddings(dataset_iterator, non_decoded_dataset_iterator, subset
 
         if max_samples is not None and i >= max_samples:
             break
-
 
     return all_embeddings, info_list, info_urls, imgs_b64, imgs_subset
 
@@ -267,11 +267,13 @@ def get_dataset_embeddings():
 
     for subset in subsets:
         log_info(f"Processing {subset}")
-        
+
         dataset_iter = get_dataset_iterator(dataset_name, subset)
         non_decoded_dataset_iter = get_dataset_iterator(dataset_name, subset, True)
 
-        subset_embeddings, subset_img_infos, info_urls, imgs_b64, imgs_subsets = get_visual_embeddings(dataset_iter, non_decoded_dataset_iter, subset)
+        subset_embeddings, subset_img_infos, info_urls, imgs_b64, imgs_subsets = get_visual_embeddings(
+            dataset_iter, non_decoded_dataset_iter, subset
+        )
         subset_embeddings = np.stack(subset_embeddings, axis=0)  # [n_imágenes, hidden_dim]
         all_embeddings_global.append(subset_embeddings)
         # all_labels.extend([subset] * subset_embeddings.shape[0])
@@ -293,8 +295,7 @@ def plot(reduced_embeddings):
     for idx, subset in enumerate(unique_subsets):
         indices = [i for i, label in enumerate(all_labels) if label == subset]
         subset_points = reduced_embeddings[indices, :]
-        plt.scatter(subset_points[:, 0], subset_points[:, 1], 
-                    color=colors[idx], label=subset, alpha=0.6)
+        plt.scatter(subset_points[:, 0], subset_points[:, 1], color=colors[idx], label=subset, alpha=0.6)
 
     plt.title("Clusters de Embeddings de Imagen (PCA) - Todos los Subsets")
     plt.xlabel("Componente Principal 1")
@@ -309,20 +310,20 @@ def plot(reduced_embeddings):
 def save_non_reduced_embeddings_csv(embeddings, version: str, img_name: str, img_label: str, img_url: str):
     n_dim = embeddings.shape[1]
     header = [f"dim_{j}" for j in range(n_dim)] + ["label", "img"]
-    
+
     file_name = f"raw_embeddings_donut_finetuned_{version}_{re.sub(r'[/-]', '_', dataset_name)}_{subset_name}_{img_name}_embeddings.csv"
     csv_path = os.path.join(RESULTS_DIR, file_name)
-    
+
     with open(csv_path, mode="w", newline="") as csv_file:
         writer = csv.writer(csv_file)
         writer.writerow(header)
-    
+
         for i in range(embeddings.shape[0]):
             embedding_values = list(embeddings[i])
             label = img_label
             img_info = img_url
             writer.writerow(embedding_values + [label, img_info])
-    
+
     return csv_path, file_name
 
 
@@ -330,24 +331,26 @@ def save_csv(embeddings, version: str):
 
     n_dim = embeddings.shape[1]
     header = [f"dim_{j}" for j in range(n_dim)] + ["label", "img"]
-    
+
     if embedding_computation == "weighted":
-        file_name = f"donut_{version}_{re.sub(r'[/-]', '_', dataset_name)}_{subset_name}_{embedding_computation}_{weight_strength}_embeddings.csv"
+        file_name = f"donut/{version}/{embedding_computation}/{re.sub(r'[/-]', '_', dataset_name)}_{subset_name}_{weight_strength}_embeddings.csv"
     else:
-        file_name = f"donut_{version}_{re.sub(r'[/-]', '_', dataset_name)}_{subset_name}_{embedding_computation}_embeddings.csv"
+        file_name = (
+            f"donut/{version}/{embedding_computation}/{re.sub(r'[/-]', '_', dataset_name)}_{subset_name}_embeddings.csv"
+        )
 
     csv_path = os.path.join(RESULTS_DIR, file_name)
-    
+
     with open(csv_path, mode="w", newline="") as csv_file:
         writer = csv.writer(csv_file)
         writer.writerow(header)
-    
+
         for i in range(embeddings.shape[0]):
             embedding_values = list(embeddings[i])
             label = all_labels[i]
             img_info = all_img_urls[i]
             writer.writerow(embedding_values + [label, img_info])
-    
+
     return csv_path, file_name
 
 
@@ -488,12 +491,12 @@ def push_csv_to_hf_space(csv_path, file_name):
         path_in_repo=path_in_repo,
         repo_id=repo_id,
         repo_type="space",
-        commit_message=f"Upload Donut {dataset_name} embeddings"
+        commit_message=f"Upload Donut {dataset_name} embeddings",
     )
 
 
 def load_external_embbedings_data():
-    
+
     df_real = pd.read_csv(f"/app/embeddings/donut_vanilla_de_Rodrigo_merit_secret_all_embeddings.csv")
 
     return df_real
@@ -510,7 +513,16 @@ if __name__ == "__main__":
     parser.add_argument("--max_samples", type=str)
     parser.add_argument("--embedding_computation", type=str)
     parser.add_argument("--weight_strength", type=float)
-    parser.add_argument("--check_img_embeddings", action="store_true", help="Show embeddings dispersion per image, not just a single value")
+    parser.add_argument(
+        "--check_img_embeddings",
+        action="store_true",
+        help="Show embeddings dispersion per image, not just a single value",
+    )
+    parser.add_argument(
+        "--loop",
+        action="store_true",
+        help="Loop over all subsets",
+    )
     args = parser.parse_args()
 
     # Debug
@@ -532,41 +544,54 @@ if __name__ == "__main__":
     check_img_embeddings = args.check_img_embeddings
     weight_strength = args.weight_strength
     embedding_computation = args.embedding_computation
+    loop = args.loop
 
     try:
         max_samples = int(max_samples)
     except:
         max_samples = None
 
-    if subset_name == "all":
-        subsets = get_dataset_config_names(dataset_name)
-    else:
-        subsets = [subset_name]
+    if loop:
+        subsets_to_process = [
+            ("de-Rodrigo/merit-aux", "IIT-CDIP", "train"),
+            ("de-Rodrigo/merit-secret", "all", "test"),
+            ("de-Rodrigo/merit", "es-digital-paragraph-degradation-seq", "train"),
+            ("de-Rodrigo/merit", "es-digital-line-degradation-seq", "train"),
+            ("de-Rodrigo/merit", "es-digital-seq", "train"),
+            ("de-Rodrigo/merit", "es-digital-rotation-degradation-seq", "train"),
+            ("de-Rodrigo/merit", "es-digital-zoom-degradation-seq", "train"),
+            ("de-Rodrigo/merit", "es-render-seq", "train"),
+        ]
 
-    # Project config
-    logging.basicConfig(level=logging.INFO)
+    for dataset_name, subset_name, split in subsets_to_process:
 
-    # Load model and processor
-    model, processor = get_donut(donut_model_version)
+        if subset_name == "all":
+            subsets = get_dataset_config_names(dataset_name)
+        else:
+            subsets = [subset_name]
 
+        # Project config
+        logging.basicConfig(level=logging.INFO)
 
-    all_embeddings_global, all_labels, all_img_infos, all_img_urls,  all_imgs_b64 = get_dataset_embeddings()
+        # Load model and processor
+        model, processor = get_donut(donut_model_version)
 
-    # Reduce dimensionality by using PCA or TSNE
-    # pca = PCA(n_components=2)
-    # reduced_embeddings_pca = pca.fit_transform(all_embeddings_global)
+        all_embeddings_global, all_labels, all_img_infos, all_img_urls, all_imgs_b64 = get_dataset_embeddings()
 
-    # tsne = TSNE(n_components=2, random_state=42, perplexity=30, learning_rate=200)
-    # reduced_embeddings_tsne = tsne.fit_transform(all_embeddings_global)
+        # Reduce dimensionality by using PCA or TSNE
+        # pca = PCA(n_components=2)
+        # reduced_embeddings_pca = pca.fit_transform(all_embeddings_global)
 
+        # tsne = TSNE(n_components=2, random_state=42, perplexity=30, learning_rate=200)
+        # reduced_embeddings_tsne = tsne.fit_transform(all_embeddings_global)
 
-    if UPLOAD_IMAGES_TO_REPO:
-        upload_multiple_files_to_github(all_img_infos, all_imgs_b64)
+        if UPLOAD_IMAGES_TO_REPO:
+            upload_multiple_files_to_github(all_img_infos, all_imgs_b64)
 
-    # WARNING: Comparing different PCA or TSNE plots is not a good idea, but it's useful to see individaul results
-    # plot(reduced_embeddings_pca)
-    # plot(reduced_embeddings_tsne)
-    
-    csv_path, file_name = save_csv(all_embeddings_global, donut_model_version)
+        # WARNING: Comparing different PCA or TSNE plots is not a good idea, but it's useful to see individaul results
+        # plot(reduced_embeddings_pca)
+        # plot(reduced_embeddings_tsne)
 
-    push_csv_to_hf_space(csv_path, file_name)
+        csv_path, file_name = save_csv(all_embeddings_global, donut_model_version)
+
+        push_csv_to_hf_space(csv_path, file_name)
