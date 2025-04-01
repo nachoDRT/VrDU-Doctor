@@ -33,6 +33,7 @@ vanillas/idefics3/log.txt
 vanillas/data
 
 *.pyc
+*.blend1
 
 single/idefics2/log.txt
 
