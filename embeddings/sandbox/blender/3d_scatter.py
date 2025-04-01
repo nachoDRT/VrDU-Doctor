@@ -1,5 +1,6 @@
 import bpy
 import pandas as pd
+import os
 
 FACTOR = 0.219938
 COLORS = [(0.069, 0.35, 1, 1), (0.475, 0, 1, 1)]
@@ -12,6 +13,8 @@ SHEETS = [
     "synthetic_es-digital-zoom-degradation-seq",
     "synthetic_es-render-seq",
 ]
+
+RENDER_RESULT = True
 
 
 def get_samples_materials():
@@ -109,6 +112,44 @@ def animate_synth_samples(data, frame_step=50):
                 print(f"Objeto {row['name']} no encontrado para la sheet {sheet_name}")
 
 
+def render_animation_from_cameras(hide_target: bool = False):
+
+    if hide_target:
+        bpy.data.collections["real_samples"].hide_render = True
+
+    camera_names = ["Camera-PC1vsPC2", "Camera-PC1vsPC3", "Camera-PC2vsPC3"]
+
+    blend_filepath = bpy.data.filepath
+    base_dir = os.path.dirname(blend_filepath)
+    output_dir = os.path.join(base_dir, "results")
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    scene = bpy.context.scene
+
+    # Configure output to render as MP4 format
+    scene.render.image_settings.file_format = "FFMPEG"
+    scene.render.ffmpeg.format = "MPEG4"
+
+    scene.render.use_file_extension = True
+
+    for cam_name in camera_names:
+        cam = bpy.data.objects.get(cam_name)
+        if cam is None:
+            print(f"Camera '{cam_name}' not found!")
+            continue
+
+        # Asignar la cámara actual a la escena
+        scene.camera = cam
+
+        # Definir la ruta de salida para este render
+        output_file = os.path.join(output_dir, f"results_{cam_name}.mp4")
+        scene.render.filepath = output_file
+
+        print(f"Rendering animation from camera: {cam_name} into file {output_file}")
+        bpy.ops.render.render(animation=True)
+
+
 if __name__ == "__main__":
 
     materials = get_samples_materials()
@@ -118,3 +159,6 @@ if __name__ == "__main__":
     synth_samples_scatter_plot(data["synthetic_es-digital-line-degradation-seq"], materials[1])
 
     animate_synth_samples(data, frame_step=50)
+
+    if RENDER_RESULT:
+        render_animation_from_cameras(hide_target=True)
