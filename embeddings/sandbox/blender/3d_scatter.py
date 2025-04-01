@@ -14,7 +14,7 @@ SHEETS = [
 ]
 
 
-def get_real_samples_material():
+def get_samples_materials():
     blue_mat = None  # bpy.data.materials.get("BlueMaterial")
     green_mat = None  # bpy.data.materials.get("GreenMaterial")
     materials = [blue_mat, green_mat]
@@ -27,6 +27,7 @@ def get_real_samples_material():
             bsdf = material.node_tree.nodes.get("Principled BSDF")
             if bsdf is not None:
                 bsdf.inputs["Base Color"].default_value = COLORS[i]
+                bsdf.inputs["Roughness"].default_value = 1.0
             materials[i] = material
 
     return materials
@@ -102,6 +103,7 @@ def animate_synth_samples(data, frame_step=50):
 
                 sphere.location = (x, y, z)
                 sphere.keyframe_insert(data_path="location", frame=frame)
+                sphere.keyframe_insert(data_path="location", frame=frame + 20)
 
             else:
                 print(f"Objeto {row['name']} no encontrado para la sheet {sheet_name}")
@@ -109,7 +111,7 @@ def animate_synth_samples(data, frame_step=50):
 
 if __name__ == "__main__":
 
-    materials = get_real_samples_material()
+    materials = get_samples_materials()
     data = load_data()
 
     real_samples_scatter_plot(data["real"], materials[0])
