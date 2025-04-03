@@ -16,7 +16,8 @@ SHEETS = [
 
 IMAGE_ROOT = bpy.path.abspath("//plots")
 RENDER_RESULT = False
-RENDER_PAUSE = 50
+ANIMATION_PAUSE = 40
+ANIMATION_STEP = 50
 INCLUDE_TRAIL = False
 
 
@@ -93,9 +94,9 @@ def get_blender_name(excel_name: str) -> str:
     return parts[1] if len(parts) > 1 else excel_name
 
 
-def animate_synth_samples(data, frame_step=20):
+def animate_synth_samples(data):
     synthetic_sheet_names = SHEETS[1:]
-    current_frame = frame_step
+    current_frame = 0
     planes = ["PC1_PC2", "PC1_PC3", "PC2_PC3"]
     sheets_sequence = [
         "es-digital-line",
@@ -106,10 +107,10 @@ def animate_synth_samples(data, frame_step=20):
         "es-render-seq",
     ]
 
-    for sheet_name in synthetic_sheet_names:
+    for i, sheet_name in enumerate(synthetic_sheet_names):
         df = data[sheet_name]
 
-        for index, row in df.iterrows():
+        for _, row in df.iterrows():
             blender_name = get_blender_name(row["name"])
             sphere = bpy.data.objects.get(blender_name)
 
@@ -119,12 +120,19 @@ def animate_synth_samples(data, frame_step=20):
                 z = row["PC3"] * FACTOR
                 sphere.location = (x, y, z)
 
-                sphere.keyframe_insert(data_path="location", frame=current_frame)
-                sphere.keyframe_insert(data_path="location", frame=current_frame + RENDER_PAUSE)
-            else:
-                print(f"Objeto {row['name']} no encontrado para la sheet {sheet_name}")
+                if i == 0:
+                    sphere.keyframe_insert(data_path="location", frame=current_frame)
+                else:
+                    sphere.keyframe_insert(data_path="location", frame=current_frame)
+                    sphere.keyframe_insert(data_path="location", frame=current_frame + ANIMATION_PAUSE)
 
-        current_frame += frame_step + RENDER_PAUSE
+            else:
+                print(f"Object {row['name']} not found for sheet {sheet_name}")
+
+        if i == 0:
+            current_frame += ANIMATION_STEP
+        else:
+            current_frame += ANIMATION_STEP + ANIMATION_PAUSE
 
     for plane in planes:
         mat_name = "Material__" + plane
@@ -133,7 +141,7 @@ def animate_synth_samples(data, frame_step=20):
             print(f"Material {mat_name} not found")
             mat = bpy.data.materials.new(mat_name)
             mat.use_nodes = True
-        create_texture_sequence_node(mat, plane, sheets_sequence, frame_change=current_frame, duration=RENDER_PAUSE)
+        create_texture_sequence_node(mat, plane, sheets_sequence, frame_change=current_frame, duration=ANIMATION_PAUSE)
 
 
 def create_texture_sequence_node(material, plane, sheets, frame_change, duration):
@@ -311,9 +319,9 @@ def create_segment_trail_curves(obj, trail_mat):
         curve_obj.hide_render = False
         curve_obj.keyframe_insert(data_path="hide_render", frame=frame_end)
         curve_obj.hide_render = False
-        curve_obj.keyframe_insert(data_path="hide_render", frame=frame_end + RENDER_PAUSE - 1)
+        curve_obj.keyframe_insert(data_path="hide_render", frame=frame_end + ANIMATION_PAUSE - 1)
         curve_obj.hide_render = True
-        curve_obj.keyframe_insert(data_path="hide_render", frame=frame_end + RENDER_PAUSE)
+        curve_obj.keyframe_insert(data_path="hide_render", frame=frame_end + ANIMATION_PAUSE)
 
         segments.append(curve_obj)
 
@@ -330,7 +338,7 @@ if __name__ == "__main__":
     real_samples_scatter_plot(data["real"], materials[0])
     synth_samples_scatter_plot(data["es-digital-line"], materials[1])
 
-    animate_synth_samples(data, frame_step=50)
+    animate_synth_samples(data)
 
     if INCLUDE_TRAIL:
         synthetic_coll = bpy.data.collections.get("synthetic_samples")
