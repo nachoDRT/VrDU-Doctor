@@ -22,6 +22,7 @@ INCLUDE_TRAIL = False
 GRADIENT_GREEN = (0.002, 0.077, 0.021, 1)
 GRADIENT_RED = (0.183, 0, 0.008, 1)
 GRADIENT_YELLOW = (0.897, 0.779, 0.250, 1)
+PLANE_NAMES = ["PC1_PC2", "PC1_PC3", "PC2_PC3"]
 
 
 ##############################
@@ -48,12 +49,27 @@ def get_samples_materials():
     return materials
 
 
-def load_data():
-    path = bpy.path.abspath("//plots/df_all_pca_donut.xlsx")
+def load_data(data_name: str = None):
+
     data = {}
-    for sheet_name in SHEETS:
+
+    if data_name == "position":
+        path = bpy.path.abspath("//plots/df_all_pca_donut.xlsx")
+        sheets = SHEETS
+    elif data_name == "distance":
+        path = bpy.path.abspath("//plots/df_real_to_synth_distance_pca_donut.xlsx")
+        sheets = SHEETS[1:]
+    elif data_name == "f1":
+        path = bpy.path.abspath("//plots/df_f1_donut.xlsx")
+        sheets = [data_name]
+    else:
+        path = bpy.path.abspath("//plots/df_all_pca_donut.xlsx")
+        sheets = SHEETS
+
+    for sheet_name in sheets:
         df = pd.read_excel(path, sheet_name=sheet_name)
         data[sheet_name] = df
+
     return data
 
 
@@ -369,36 +385,82 @@ def animate_synthetic_transformations():
 ###############################
 
 
-def show_real_samples_by_proximity():
+def show_real_samples_by_proximity(sheet: str, include_synth: bool = False):
     """
     Create a static 3D plot where those real samples that are closest to synthetic samples
     are green (while the opposite are red).
     """
 
-    data = load_data()
-    real_samples_as_gradient("real_samples_proximity_gradient", data["real"])
+    data_pos = load_data("position")
+    data_dist = load_data("distance")
+
+    real_samples_as_gradient(
+        collection_name="real_samples_proximity_gradient",
+        data_to_plot=data_pos["real"],
+        colored_by=data_dist[sheet],
+        grad_key="mean_distance",
+    )
+
+    if include_synth:
+        materials = get_samples_materials()
+        synth_samples_scatter_plot(data_pos[sheet], materials[1])
+
+    add_texture_to_planes()
 
 
-def show_real_samples_by_f1():
-    pass
+def show_real_samples_by_f1(synth_version: str, include_synth: bool = False):
+    """
+    Create a static 3D plot where those real with better f1 score
+    are green (while the opposite are red).
+    """
+
+    data_pos = load_data("position")
+    data_f1 = load_data("f1")
+
+    real_samples_as_gradient(
+        collection_name="real_samples_proximity_gradient",
+        data_to_plot=data_pos["real"],
+        colored_by=data_f1["f1"],
+        grad_key=synth_version,
+        re_arrange_colors=True,
+    )
+
+    if include_synth:
+        materials = get_samples_materials()
+        synth_samples_scatter_plot(data_pos[synth_version], materials[1])
+
+    add_texture_to_planes()
 
 
 def show_real_samples_by_proximity_vs_f1_mismatch():
     pass
 
 
-def real_samples_as_gradient(collection_name: str, df: pd.DataFrame, r: float = 0.015):
+def real_samples_as_gradient(
+    collection_name: str,
+    data_to_plot: pd.DataFrame,
+    colored_by: pd.DataFrame,
+    grad_key: str,
+    range: tuple = None,
+    r: float = 0.015,
+    re_arrange_colors: bool = False,
+):
 
-    min_grad = df["PC3"].min()
-    max_grad = df["PC3"].max()
-    mid_grad = (min_grad + max_grad) / 2
+    if not range:
+        min_grad = colored_by[grad_key].min()
+        max_grad = colored_by[grad_key].max()
+        mid_grad = (min_grad + max_grad) / 2
+    else:
+        min_grad = 0.0
+        max_grad = 1.0
+        mid_grad = 0.5
 
     scatter_coll = bpy.data.collections.get(collection_name)
     if scatter_coll is None:
         scatter_coll = bpy.data.collections.new(collection_name)
         bpy.context.scene.collection.children.link(scatter_coll)
 
-    for index, row in df.iterrows():
+    for (index, row), (_, row_to_color) in zip(data_to_plot.iterrows(), colored_by.iterrows()):
         x = row["PC1"] * FACTOR
         y = row["PC2"] * FACTOR
         z = row["PC3"] * FACTOR
@@ -408,10 +470,27 @@ def real_samples_as_gradient(collection_name: str, df: pd.DataFrame, r: float = 
 
         sphere.name = row["name"]
 
-        grad_value = row["PC3"]
+        grad_value = row_to_color[grad_key]
         color = compute_gradient_color(
-            grad_value, min_grad, mid_grad, max_grad, GRADIENT_GREEN, GRADIENT_YELLOW, GRADIENT_RED
+            grad_value,
+            min_grad,
+            mid_grad,
+            max_grad,
+            GRADIENT_GREEN,
+            GRADIENT_YELLOW,
+            GRADIENT_RED,
         )
+
+        if re_arrange_colors:
+            color = compute_gradient_color(
+                grad_value,
+                min_grad,
+                mid_grad,
+                max_grad,
+                GRADIENT_RED,
+                GRADIENT_YELLOW,
+                GRADIENT_GREEN,
+            )
 
         mat_name = f"GradientMat_{index}"
         mat = bpy.data.materials.new(name=mat_name)
@@ -449,8 +528,58 @@ def compute_gradient_color(value, min_val, mid_val, max_val, color_min, color_mi
     return (r, g, b, a)
 
 
+def add_texture_to_planes():
+
+    img_path = os.path.join(IMAGE_ROOT, "blank_plot", "blank_plot.png")
+
+    try:
+        img = bpy.data.images.load(img_path)
+    except Exception as e:
+        print(f"Imposible to load {img_path}: {e}")
+        return
+
+    for plane_name in PLANE_NAMES:
+        plane_obj = bpy.data.objects.get(plane_name)
+        if plane_obj is None:
+            print(f"Object {plane_name} not found in scene")
+            continue
+
+        if plane_obj.data.materials:
+            mat = plane_obj.data.materials[0]
+            if mat is None:
+                mat = bpy.data.materials.new(name=f"Mat_{plane_name}")
+                plane_obj.data.materials[0] = mat
+        else:
+            mat = bpy.data.materials.new(name=f"Mat_{plane_name}")
+            plane_obj.data.materials.append(mat)
+
+        mat.use_nodes = True
+        nodes = mat.node_tree.nodes
+        links = mat.node_tree.links
+
+        bsdf = nodes.get("Principled BSDF")
+        if not bsdf:
+            bsdf = nodes.new(type="ShaderNodeBsdfPrincipled")
+            bsdf.location = (0, 0)
+
+        tex_image = nodes.new("ShaderNodeTexImage")
+        tex_image.image = img
+        tex_image.location = (-300, 300)
+
+        if not bsdf.inputs["Base Color"].is_linked:
+            links.new(tex_image.outputs["Color"], bsdf.inputs["Base Color"])
+
+        material_output = nodes.get("Material Output")
+        if not material_output:
+            material_output = nodes.new("ShaderNodeOutputMaterial")
+            material_output.location = (200, 0)
+        if not material_output.inputs["Surface"].is_linked:
+            links.new(bsdf.outputs["BSDF"], material_output.inputs["Surface"])
+
+
 if __name__ == "__main__":
 
     # animate_synthetic_transformations()
 
-    show_real_samples_by_proximity()
+    # show_real_samples_by_proximity("es-render-seq", include_synth=True)
+    show_real_samples_by_f1("es-render-seq", include_synth=True)
