@@ -121,7 +121,7 @@ def render_animation_from_cameras(hide_target: bool = False):
     if hide_target:
         bpy.data.collections["real_samples"].hide_render = True
 
-    camera_names = ["Camera-PC1vsPC2", "Camera-PC1vsPC3", "Camera-PC2vsPC3"]
+    camera_names = ["Camera-ISO", "Camera-PC1vsPC2", "Camera-PC1vsPC3", "Camera-PC2vsPC3"]
 
     blend_filepath = bpy.data.filepath
     base_dir = os.path.dirname(blend_filepath)
