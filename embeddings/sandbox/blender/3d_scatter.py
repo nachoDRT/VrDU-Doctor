@@ -14,8 +14,10 @@ SHEETS = [
     "es-render-seq",
 ]
 
-RENDER_RESULT = True
+IMAGE_ROOT = bpy.path.abspath("//plots")
+RENDER_RESULT = False
 RENDER_PAUSE = 50
+INCLUDE_TRAIL = False
 
 
 def get_samples_materials():
@@ -63,7 +65,7 @@ def scatter_plot(collection_name: str, df: pd.DataFrame, mat, keyframes: bool = 
         if collection_name == "real_samples":
             sphere.name = row["name"]
         else:
-            sphere.name = get_blender_name(row["name"])  # row["name"]
+            sphere.name = get_blender_name(row["name"])
 
         if sphere.data.materials:
             sphere.data.materials[0] = mat
@@ -94,6 +96,15 @@ def get_blender_name(excel_name: str) -> str:
 def animate_synth_samples(data, frame_step=20):
     synthetic_sheet_names = SHEETS[1:]
     current_frame = frame_step
+    planes = ["PC1_PC2", "PC1_PC3", "PC2_PC3"]
+    sheets_sequence = [
+        "es-digital-line",
+        "es-digital-paragraph",
+        "es-digital-seq",
+        "es-digital-rotation",
+        "es-digital-zoom",
+        "es-render-seq",
+    ]
 
     for sheet_name in synthetic_sheet_names:
         df = data[sheet_name]
@@ -110,11 +121,114 @@ def animate_synth_samples(data, frame_step=20):
 
                 sphere.keyframe_insert(data_path="location", frame=current_frame)
                 sphere.keyframe_insert(data_path="location", frame=current_frame + RENDER_PAUSE)
-
             else:
                 print(f"Objeto {row['name']} no encontrado para la sheet {sheet_name}")
 
         current_frame += frame_step + RENDER_PAUSE
+
+    for plane in planes:
+        mat_name = "Material__" + plane
+        mat = bpy.data.materials.get(mat_name)
+        if mat is None:
+            print(f"Material {mat_name} not found")
+            mat = bpy.data.materials.new(mat_name)
+            mat.use_nodes = True
+        create_texture_sequence_node(mat, plane, sheets_sequence, frame_change=current_frame, duration=RENDER_PAUSE)
+
+
+def create_texture_sequence_node(material, plane, sheets, frame_change, duration):
+    nt = material.node_tree
+    nodes = nt.nodes
+    links = nt.links
+
+    output_node = None
+    for node in nodes:
+        if node.type == "OUTPUT_MATERIAL":
+            output_node = node
+            break
+    if output_node is None:
+        output_node = nodes.new("ShaderNodeOutputMaterial")
+        output_node.location = (300, 0)
+
+    bsdf = None
+    for node in nodes:
+        if node.type == "BSDF_PRINCIPLED":
+            bsdf = node
+            break
+    if bsdf is None:
+        bsdf = nodes.new("ShaderNodeBsdfPrincipled")
+        bsdf.location = (0, 0)
+        links.new(bsdf.outputs["BSDF"], output_node.inputs["Surface"])
+
+    bsdf.inputs["Metallic"].default_value = 0.75
+    bsdf.inputs["Roughness"].default_value = 1.0
+    bsdf.inputs["IOR"].default_value = 1.0
+    bsdf.inputs["Alpha"].default_value = 1.0
+
+    image_nodes = []
+    for i, sheet in enumerate(sheets):
+        # Img path: <IMAGE_ROOT>/<sheet>/<plane>_<sheet>.png
+        image_file = os.path.join(IMAGE_ROOT, sheet, f"{plane}_{sheet}.png")
+        if not os.path.isfile(image_file):
+            print(f"Image not found: {image_file}")
+            continue
+        try:
+            img = bpy.data.images.load(image_file, check_existing=True)
+        except Exception as e:
+            print(f"Error loading {image_file}: {e}")
+            continue
+
+        tex_node = nodes.new("ShaderNodeTexImage")
+        tex_node.image = img
+        tex_node.label = f"{plane}_{sheet}"
+        tex_node.location = (-600, 300 - i * 200)
+        image_nodes.append(tex_node)
+
+    if not image_nodes:
+        print(f"No loaded imgs for {plane}")
+        return
+
+    if len(image_nodes) == 1:
+        links.new(image_nodes[0].outputs["Color"], bsdf.inputs["Base Color"])
+        return
+
+    mix_nodes = []
+    mix = nodes.new("ShaderNodeMixRGB")
+    mix.blend_type = "MIX"
+    mix.location = (-300, 300)
+    mix.inputs["Fac"].default_value = 0.0  # Show first img initially
+    links.new(image_nodes[0].outputs["Color"], mix.inputs[1])
+    links.new(image_nodes[1].outputs["Color"], mix.inputs[2])
+    mix_nodes.append(mix)
+
+    previous_node = mix
+    for i in range(2, len(image_nodes)):
+        mix_next = nodes.new("ShaderNodeMixRGB")
+        mix_next.blend_type = "MIX"
+        mix_next.location = (-100, 300 - (i - 1) * 200)
+        mix_next.inputs["Fac"].default_value = 0.0  # Show previous img initially
+        links.new(previous_node.outputs["Color"], mix_next.inputs[1])
+        links.new(image_nodes[i].outputs["Color"], mix_next.inputs[2])
+        mix_nodes.append(mix_next)
+        previous_node = mix_next
+
+    links.new(previous_node.outputs["Color"], bsdf.inputs["Base Color"])
+
+    current_frame = 0
+    if mix_nodes:
+        first_mix = mix_nodes[0]
+        first_mix.inputs["Fac"].default_value = 0.0
+        first_mix.inputs["Fac"].keyframe_insert(data_path="default_value", frame=current_frame)
+        first_mix.inputs["Fac"].default_value = 1.0
+        first_mix.inputs["Fac"].keyframe_insert(data_path="default_value", frame=current_frame + duration)
+        current_frame += duration
+
+        for mix_node in mix_nodes[1:]:
+            mix_node.inputs["Fac"].default_value = 0.0
+            mix_node.inputs["Fac"].keyframe_insert(data_path="default_value", frame=current_frame)
+            mix_node.inputs["Fac"].default_value = 1.0
+            mix_node.inputs["Fac"].keyframe_insert(data_path="default_value", frame=current_frame + duration)
+            current_frame += duration
 
 
 def render_animation_from_cameras(hide_target: bool = False):
@@ -131,7 +245,6 @@ def render_animation_from_cameras(hide_target: bool = False):
 
     scene = bpy.context.scene
 
-    # Configurar salida de render a formato MP4
     scene.render.image_settings.file_format = "FFMPEG"
     scene.render.ffmpeg.format = "MPEG4"
     scene.render.use_file_extension = True
@@ -219,10 +332,11 @@ if __name__ == "__main__":
 
     animate_synth_samples(data, frame_step=50)
 
-    synthetic_coll = bpy.data.collections.get("synthetic_samples")
-    if synthetic_coll is not None:
-        for obj in synthetic_coll.objects:
-            create_segment_trail_curves(obj, materials[1])
+    if INCLUDE_TRAIL:
+        synthetic_coll = bpy.data.collections.get("synthetic_samples")
+        if synthetic_coll is not None:
+            for obj in synthetic_coll.objects:
+                create_segment_trail_curves(obj, materials[1])
 
     if RENDER_RESULT:
         render_animation_from_cameras(hide_target=True)
