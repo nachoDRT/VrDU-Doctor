@@ -141,10 +141,10 @@ def animate_synth_samples(data):
             print(f"Material {mat_name} not found")
             mat = bpy.data.materials.new(mat_name)
             mat.use_nodes = True
-        create_texture_sequence_node(mat, plane, sheets_sequence, frame_change=current_frame, duration=ANIMATION_PAUSE)
+        create_texture_sequence_node(mat, plane, sheets_sequence)
 
 
-def create_texture_sequence_node(material, plane, sheets, frame_change, duration):
+def create_texture_sequence_node(material, plane, sheets):
     nt = material.node_tree
     nodes = nt.nodes
     links = nt.links
@@ -228,15 +228,17 @@ def create_texture_sequence_node(material, plane, sheets, frame_change, duration
         first_mix.inputs["Fac"].default_value = 0.0
         first_mix.inputs["Fac"].keyframe_insert(data_path="default_value", frame=current_frame)
         first_mix.inputs["Fac"].default_value = 1.0
-        first_mix.inputs["Fac"].keyframe_insert(data_path="default_value", frame=current_frame + duration)
-        current_frame += duration
+        first_mix.inputs["Fac"].keyframe_insert(data_path="default_value", frame=current_frame + ANIMATION_STEP)
+        current_frame += ANIMATION_STEP
 
         for mix_node in mix_nodes[1:]:
             mix_node.inputs["Fac"].default_value = 0.0
             mix_node.inputs["Fac"].keyframe_insert(data_path="default_value", frame=current_frame)
             mix_node.inputs["Fac"].default_value = 1.0
-            mix_node.inputs["Fac"].keyframe_insert(data_path="default_value", frame=current_frame + duration)
-            current_frame += duration
+            mix_node.inputs["Fac"].keyframe_insert(
+                data_path="default_value", frame=current_frame + ANIMATION_PAUSE + ANIMATION_STEP
+            )
+            current_frame += ANIMATION_PAUSE + ANIMATION_STEP
 
 
 def render_animation_from_cameras(hide_target: bool = False):
