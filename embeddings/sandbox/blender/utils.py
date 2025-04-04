@@ -31,13 +31,13 @@ def load_data(file: str, sheets: List) -> Dict:
     return data
 
 
-def write_data(distance_results: Dict):
+def write_data(results: Dict, file_name: str):
 
-    path = join(dirname(abspath(__file__)), "plots", "df_real_to_synth_distance_pca_donut.xlsx")
+    path = join(dirname(abspath(__file__)), "plots", file_name)
 
     with pd.ExcelWriter(path) as writer:
 
-        for sheet, df in distance_results.items():
+        for sheet, df in results.items():
             df.to_excel(writer, sheet_name=sheet)
 
 
@@ -63,7 +63,7 @@ def create_distance_database():
         distance_df["mean_distance"] = distance_df.mean(axis=1)
         distance_results[sheet] = distance_df
 
-    write_data(distance_results)
+    write_data(distance_results, "df_real_to_synth_distance_pca_donut.xlsx")
 
 
 def compute_hiperplanes(feature: str, visualize: bool = False, decision: str = "ensure-ovr"):
@@ -88,6 +88,14 @@ def compute_hiperplanes(feature: str, visualize: bool = False, decision: str = "
 
     if visualize:
         plot_plane(clf, X, y)
+
+    df = pd.DataFrame(columns=["w1", "w2", "w3", "b"])
+    for w, b in zip(clf.coef_, clf.intercept_):
+        df = df._append(pd.Series([*w, b], index=df.columns), ignore_index=True)
+
+    df.index = [f"hiperplane_{i}" for i in range(len(df))]
+
+    return df
 
 
 def plot_plane(clf, X, y):
@@ -120,7 +128,51 @@ def plot_plane(clf, X, y):
     # print(clf.predict([[-0.8, -1, 3]]))
 
 
+def create_hiperplanes_database():
+
+    # columns = [
+    #     "v_info_blocks",
+    #     "v_density",
+    #     "layout",
+    #     "columns",
+    #     "grades",
+    #     "source",
+    #     "shadows",
+    #     "header_badge",
+    #     "signed",
+    #     "stamped",
+    #     "table_pos",
+    #     "orthogonal_distotion",
+    #     "white_border",
+    #     "annonimization_marks",
+    #     "wrinkles",
+    #     "height",
+    #     "width",
+    #     "rotation",
+    # ]
+
+    columns = [
+        "v_info_blocks",
+        "v_density",
+        "layout",
+        "columns",
+        "grades",
+        "source",
+        "shadows",
+        "header_badge",
+        "signed",
+        "stamped",
+        "table_pos",
+    ]
+
+    hiperplanes = {}
+    for column in columns:
+        hiperplanes[column] = compute_hiperplanes(column, visualize=False)
+
+    write_data(hiperplanes, "hiperplanes.xlsx")
+
+
 if __name__ == "__main__":
 
     # create_distance_database()
-    compute_hiperplanes("grades", visualize=True)
+    create_hiperplanes_database()
