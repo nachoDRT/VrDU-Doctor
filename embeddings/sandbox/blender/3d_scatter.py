@@ -1,6 +1,7 @@
 import bpy
 import pandas as pd
 import os
+import mathutils
 
 FACTOR = 0.219938
 COLORS = [(0.069, 0.35, 1, 1), (0.475, 0, 1, 1)]
@@ -23,6 +24,19 @@ GRADIENT_GREEN = (0.002, 0.077, 0.021, 1)
 GRADIENT_RED = (0.183, 0, 0.008, 1)
 GRADIENT_YELLOW = (0.897, 0.779, 0.250, 1)
 PLANE_NAMES = ["PC1_PC2", "PC1_PC3", "PC2_PC3"]
+FEATURES = [
+    "v_info_blocks",
+    "v_density",
+    "layout",
+    "columns",
+    "grades",
+    "source",
+    "shadows",
+    "header_badge",
+    "signed",
+    "stamped",
+    "table_pos",
+]
 
 
 ##############################
@@ -62,8 +76,11 @@ def load_data(data_name: str = None):
     elif data_name == "f1":
         path = bpy.path.abspath("//plots/df_f1_donut.xlsx")
         sheets = [data_name]
+    elif data_name == "planes":
+        path = bpy.path.abspath("//plots/hiperplanes.xlsx")
+        sheets = FEATURES
     else:
-        path = bpy.path.abspath("//plots/df_all_pca_donut.xlsx")
+        path = bpy.path.abspath("//plots/hiperplanes.xlsx")
         sheets = SHEETS
 
     for sheet_name in sheets:
@@ -577,9 +594,51 @@ def add_texture_to_planes():
             links.new(bsdf.outputs["BSDF"], material_output.inputs["Surface"])
 
 
+def create_plane_from_hyperplane(w, b, size=10):
+    # Convert the coefficients into a normalized normal vector
+    normal = mathutils.Vector(w).normalized()
+
+    # Calculate a point on the plane:
+    # We use the strategy: if w[2] is non-zero, set x=0 and y=0.
+    if abs(normal.z) > 1e-6:
+        point = mathutils.Vector((0, 0, -b / normal.z))
+    elif abs(normal.y) > 1e-6:
+        point = mathutils.Vector((0, -b / normal.y, 0))
+    else:
+        point = mathutils.Vector((-b / normal.x, 0, 0))
+
+    # Create the plane in Blender with the desired size at the calculated point
+    bpy.ops.mesh.primitive_plane_add(size=size, location=point)
+    plane = bpy.context.active_object
+
+    # The default normal of the created plane is (0, 0, 1)
+    default_normal = mathutils.Vector((0, 0, 1))
+    # Calculate the rotation needed to align the default normal to the hyperplane normal
+    rotation_quat = default_normal.rotation_difference(normal)
+
+    # Apply the rotation to the plane
+    plane.rotation_mode = "QUATERNION"
+    plane.rotation_quaternion = rotation_quat
+
+
+def show_planes(feature: str):
+
+    data = load_data("planes")
+
+    for _, row in data[feature].iterrows():
+        w = [row["w1"], row["w2"], row["w3"]]
+        b = row["b"]
+        create_plane_from_hyperplane(w, b, size=25)
+
+
 if __name__ == "__main__":
 
     # animate_synthetic_transformations()
 
     # show_real_samples_by_proximity("es-render-seq", include_synth=True)
     show_real_samples_by_f1("es-render-seq", include_synth=True)
+
+    # TODO
+    # show_real_samples_by_feature()
+
+    show_planes("grades")
