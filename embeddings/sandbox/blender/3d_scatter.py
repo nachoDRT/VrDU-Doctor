@@ -595,17 +595,20 @@ def add_texture_to_planes():
 
 
 def create_plane_from_hyperplane(w, b, size=10):
-    # Convert the coefficients into a normalized normal vector
+
     normal = mathutils.Vector(w).normalized()
 
-    # Calculate a point on the plane:
-    # We use the strategy: if w[2] is non-zero, set x=0 and y=0.
     if abs(normal.z) > 1e-6:
-        point = mathutils.Vector((0, 0, -b / normal.z))
+        # For the z axis, we assume the current behavior is correct.
+        point = mathutils.Vector((0, 0, -b / w[2]))
     elif abs(normal.y) > 1e-6:
-        point = mathutils.Vector((0, -b / normal.y, 0))
+        # For the y axis, invert the sign to obtain the expected intercept.
+        point = mathutils.Vector((0, -b / w[1], 0))
     else:
-        point = mathutils.Vector((-b / normal.x, 0, 0))
+        # For the x axis, invert the sign as well.
+        point = mathutils.Vector((-b / w[0], 0, 0))
+
+    point = mathutils.Vector([p_i * f_i for p_i, f_i in zip(point, (FACTOR, FACTOR, FACTOR))])
 
     # Create the plane in Blender with the desired size at the calculated point
     bpy.ops.mesh.primitive_plane_add(size=size, location=point)
@@ -636,7 +639,7 @@ if __name__ == "__main__":
     # animate_synthetic_transformations()
 
     # show_real_samples_by_proximity("es-render-seq", include_synth=True)
-    show_real_samples_by_f1("es-render-seq", include_synth=True)
+    # show_real_samples_by_f1("es-render-seq", include_synth=True)
 
     # TODO
     # show_real_samples_by_feature()
