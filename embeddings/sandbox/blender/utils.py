@@ -5,8 +5,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.svm import SVC
 from typing import List
-
 from sklearn.svm import LinearSVC
+import pickle
 
 SHEETS = [
     "real",
@@ -94,6 +94,23 @@ def compute_hiperplanes(feature: str, visualize: bool = False, decision: str = "
         df = df._append(pd.Series([*w, b], index=df.columns), ignore_index=True)
 
     df.index = [f"hiperplane_{i}" for i in range(len(df))]
+
+    model_path = join(dirname(abspath(__file__)), "plots", f"model_{feature}.npz")
+    model_data = {"coef": clf.coef_, "intercept": clf.intercept_, "classes": clf.classes_}
+
+    print("Saving Model")
+    with open(model_path, "wb") as f:
+        pickle.dump(model_data, f, protocol=4)
+
+    # Just checking we can open the model
+    # print("Opening model")
+    # with open(model_path, "rb") as f:
+    #     model_data = pickle.load(f)
+
+    # clf_ = LinearSVC()
+    # clf_.classes_ = model_data["classes"]
+    # clf_.coef_ = model_data["coef"]
+    # clf_.intercept_ = model_data["intercept"]
 
     return df
 
