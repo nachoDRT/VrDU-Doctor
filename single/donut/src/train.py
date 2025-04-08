@@ -18,7 +18,7 @@ from transformers import (
 from typing import Any, List, Tuple
 from torch.utils.data import DataLoader, SubsetRandomSampler, ConcatDataset
 from nltk import edit_distance
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, ConcatDataset
 from pytorch_lightning.callbacks import EarlyStopping, Callback
 from pytorch_lightning.loggers import WandbLogger
 from PIL import Image
@@ -426,7 +426,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--debug", type=str)
     parser.add_argument("--dataset_name", type=str)
-    parser.add_argument("--dataset_subset", type=str)
+    parser.add_argument("--dataset_subsets", type=str, action='append')
     args = parser.parse_args()
 
     # Debug
@@ -437,7 +437,7 @@ if __name__ == "__main__":
 
     # Define constants
     dataset = args.dataset_name
-    dataset_subset = args.dataset_subset
+    dataset_subsets = args.dataset_subsets
     model_output_name = "".join(["donut-", dataset.split('/')[-1]])
 
     login(token=os.getenv("HUGGINGFACE_HUB_TOKEN"))
@@ -464,7 +464,17 @@ if __name__ == "__main__":
         train_dataset, val_dataset = load_secret_dataset(dataset, subsets_disponibles)
     
     else:
-        train_dataset, val_dataset = load_session_datasets(dataset_name=dataset, subset=dataset_subset)
+
+        train_dataset = []
+        val_dataset = []
+
+        for subset in dataset_subsets:
+            train_ds, val_ds = load_session_datasets(dataset_name=dataset, subset=subset)
+            train_dataset.append(train_ds)
+            val_dataset.append(val_ds)
+        
+        train_dataset = ConcatDataset(train_dataset)
+        val_dataset = ConcatDataset(val_dataset)
 
     model.config.pad_token_id = processor.tokenizer.pad_token_id
     model.config.decoder_start_token_id = processor.tokenizer.convert_tokens_to_ids(
@@ -501,7 +511,7 @@ if __name__ == "__main__":
     model_module = DonutModelPLModule(config, processor, model)
 
     wandb.login(key=os.getenv("WANDB_API_KEY"))
-    wandb_logger = WandbLogger(project="Donut", name=dataset_subset)
+    wandb_logger = WandbLogger(project="Donut", name="_".join(dataset_subsets))
 
     early_stop_callback = EarlyStopping(
         monitor="val_edit_distance", patience=4, verbose=False, mode="min"
@@ -518,7 +528,7 @@ if __name__ == "__main__":
         precision=16,
         num_sanity_val_steps=0,
         logger=wandb_logger,
-        callbacks=[PushToHubCallback("donut-merit", dataset_subset)],
+        callbacks=[PushToHubCallback("donut-merit", "_".join(dataset_subsets))],
     )
 
     trainer.fit(model_module)
