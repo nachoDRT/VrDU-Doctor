@@ -4,7 +4,7 @@ import os
 import mathutils
 
 FACTOR = 0.219938
-COLORS = [(0.069, 0.35, 1, 1), (0.475, 0, 1, 1)]
+COLORS = [(0.069, 0.35, 1, 1), (0.475, 0, 1, 1), (0.069, 0.35, 1, 0.75)]
 SHEETS = [
     "real",
     "es-digital-line",
@@ -623,6 +623,24 @@ def create_plane_from_hyperplane(w, b, size=10):
     plane.rotation_mode = "QUATERNION"
     plane.rotation_quaternion = rotation_quat
 
+    mat_name = "HyperplaneMaterial"
+    if mat_name in bpy.data.materials:
+        mat = bpy.data.materials[mat_name]
+    else:
+        mat = bpy.data.materials.new(name=mat_name)
+        mat.use_nodes = True
+        bsdf = mat.node_tree.nodes.get("Principled BSDF")
+        if bsdf:
+            bsdf.inputs["Base Color"].default_value = COLORS[2]
+            bsdf.inputs["Alpha"].default_value = 0.2
+            bsdf.inputs["Roughness"].default_value = 1
+            bsdf.inputs["Metallic"].default_value = 1
+
+    if plane.data.materials:
+        plane.data.materials[0] = mat
+    else:
+        plane.data.materials.append(mat)
+
 
 def show_planes(feature: str):
 
@@ -631,7 +649,7 @@ def show_planes(feature: str):
     for _, row in data[feature].iterrows():
         w = [row["w1"], row["w2"], row["w3"]]
         b = row["b"]
-        create_plane_from_hyperplane(w, b, size=25)
+        create_plane_from_hyperplane(w, b)
 
 
 if __name__ == "__main__":
@@ -644,4 +662,4 @@ if __name__ == "__main__":
     # TODO
     # show_real_samples_by_feature()
 
-    show_planes("grades")
+    show_planes("v_density")
