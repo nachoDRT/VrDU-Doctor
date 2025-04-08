@@ -129,8 +129,8 @@ def real_samples_scatter_plot(df, mat):
     scatter_plot("real_samples", df, mat)
 
 
-def synth_samples_scatter_plot(df, mat):
-    scatter_plot("synthetic_samples", df, mat, keyframes=True, r=0.01)
+def synth_samples_scatter_plot(df, mat, collection_name_detail: str = ""):
+    scatter_plot(f"synthetic_samples_{collection_name_detail}", df, mat, keyframes=True, r=0.01)
 
 
 def get_blender_name(excel_name: str) -> str:
@@ -383,7 +383,7 @@ def animate_synthetic_transformations():
     """
 
     materials = get_samples_materials()
-    data = load_data()
+    data = load_data("position")
 
     real_samples_scatter_plot(data["real"], materials[0])
     synth_samples_scatter_plot(data["es-digital-line"], materials[1])
@@ -438,7 +438,7 @@ def show_real_samples_by_f1(synth_version: str, include_synth: bool = False):
     data_f1 = load_data("f1")
 
     real_samples_as_gradient(
-        collection_name="real_samples_proximity_gradient",
+        collection_name=f"real_samples_f1_gradient_{synth_version}",
         data_to_plot=data_pos["real"],
         colored_by=data_f1["f1"],
         grad_key=synth_version,
@@ -512,7 +512,7 @@ def real_samples_as_gradient(
                 GRADIENT_GREEN,
             )
 
-        mat_name = f"GradientMat_{index}"
+        mat_name = f"GradientMat_{collection_name}_{index}"
         mat = bpy.data.materials.new(name=mat_name)
         mat.use_nodes = True
         bsdf = mat.node_tree.nodes.get("Principled BSDF")
@@ -644,27 +644,71 @@ def create_plane_from_hyperplane(w, b, size=10):
     else:
         plane.data.materials.append(mat)
 
+    return plane
 
-def show_planes(feature: str):
+
+def show_planes():
 
     data = load_data("planes")
-    model_path = bpy.path.abspath(f"//plots/model_{feature}.npz")
-    print(model_path)
 
-    with open(model_path, "rb") as f:
-        model_data = pickle.load(f)
+    for key, values in data.items():
 
-    clf_ = LinearSVC()
-    clf_.classes_ = model_data["classes"]
-    clf_.coef_ = model_data["coef"]
-    clf_.intercept_ = model_data["intercept"]
+        collection_name = f"cluster_division_{key}"
+        new_collection = bpy.data.collections.new(collection_name)
+        bpy.context.scene.collection.children.link(new_collection)
 
-    # print(clf_.predict([[-0.8, -1, 3]]))
+        model_path = bpy.path.abspath(f"//plots/model_{key}.npz")
 
-    for _, row in data[feature].iterrows():
-        w = [row["w1"], row["w2"], row["w3"]]
-        b = row["b"]
-        create_plane_from_hyperplane(w, b)
+        with open(model_path, "rb") as f:
+            model_data = pickle.load(f)
+
+        clf_ = LinearSVC()
+        clf_.classes_ = model_data["classes"]
+        clf_.coef_ = model_data["coef"]
+        clf_.intercept_ = model_data["intercept"]
+
+        # print(clf_.predict([[-0.8, -1, 3]]))
+
+        for _, row in data[key].iterrows():
+            w = [row["w1"], row["w2"], row["w3"]]
+            b = row["b"]
+            plane_obj = create_plane_from_hyperplane(w, b)
+            new_collection.objects.link(plane_obj)
+            bpy.context.scene.collection.objects.unlink(plane_obj)
+
+
+def new_samples_target_features():
+
+    target_obj = bpy.data.objects.get("new_samples_target")
+    target_features = {}
+
+    if target_obj:
+        coords = target_obj.location
+        location = [coords[0] / FACTOR, coords[1] / FACTOR, coords[2] / FACTOR]
+
+    data = load_data("planes")
+
+    for key in data.keys():
+        model_path = bpy.path.abspath(f"//plots/model_{key}.npz")
+
+        with open(model_path, "rb") as f:
+            model_data = pickle.load(f)
+
+        clf_ = LinearSVC()
+        clf_.classes_ = model_data["classes"]
+        clf_.coef_ = model_data["coef"]
+        clf_.intercept_ = model_data["intercept"]
+
+        pred = clf_.predict([location])[0]
+
+        if hasattr(pred, "item"):
+            target_features[key] = pred.item()
+        else:
+            target_features[key] = pred
+
+    print(target_features)
+
+    return target_features
 
 
 if __name__ == "__main__":
@@ -672,9 +716,16 @@ if __name__ == "__main__":
     # animate_synthetic_transformations()
 
     # show_real_samples_by_proximity("es-render-seq", include_synth=True)
-    # show_real_samples_by_f1("es-render-seq", include_synth=True)
+    show_real_samples_by_f1("es-render-seq", include_synth=False)
 
     # TODO
     # show_real_samples_by_feature()
 
-    show_planes("v_density")
+    # show_planes()
+
+    materials = get_samples_materials()
+    data = load_data("position")
+    subset = "es-render-seq"
+    synth_samples_scatter_plot(data[subset], materials[1], collection_name_detail=subset)
+
+    new_samples_target_features()
