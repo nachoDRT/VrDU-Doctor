@@ -24,7 +24,11 @@ from pytorch_lightning.loggers import WandbLogger
 from PIL import Image
 import ast
 
-HF_CARD_FILES = ["/app/src/card/README.md", "/app/src/card/.huggingface.yaml", "/app/src/card/assets/dragon_huggingface.png"]
+HF_CARD_FILES = [
+    "/app/src/card/README.md",
+    "/app/src/card/.huggingface.yaml",
+    "/app/src/card/assets/dragon_huggingface.png",
+]
 
 
 class DonutModelPLModule(pl.LightningModule):
@@ -67,12 +71,8 @@ class DonutModelPLModule(pl.LightningModule):
 
         predictions = []
         for seq in self.processor.tokenizer.batch_decode(outputs.sequences):
-            seq = seq.replace(self.processor.tokenizer.eos_token, "").replace(
-                self.processor.tokenizer.pad_token, ""
-            )
-            seq = re.sub(
-                r"<.*?>", "", seq, count=1
-            ).strip()  # remove first task start token
+            seq = seq.replace(self.processor.tokenizer.eos_token, "").replace(self.processor.tokenizer.pad_token, "")
+            seq = re.sub(r"<.*?>", "", seq, count=1).strip()  # remove first task start token
             predictions.append(seq)
 
         scores = []
@@ -139,9 +139,7 @@ class DonutDataset(Dataset):
         self.split = split
         self.ignore_id = ignore_id
         self.task_start_token = task_start_token
-        self.prompt_end_token = (
-            prompt_end_token if prompt_end_token else task_start_token
-        )
+        self.prompt_end_token = prompt_end_token if prompt_end_token else task_start_token
         self.sort_json_key = sort_json_key
 
         self.dataset = load_dataset(dataset_name_or_path, name=subset, split=self.split, num_proc=8)
@@ -179,9 +177,7 @@ class DonutDataset(Dataset):
             )
 
         self.add_tokens([self.task_start_token, self.prompt_end_token])
-        self.prompt_end_token_id = processor.tokenizer.convert_tokens_to_ids(
-            self.prompt_end_token
-        )
+        self.prompt_end_token_id = processor.tokenizer.convert_tokens_to_ids(self.prompt_end_token)
 
     def json2token(
         self,
@@ -206,20 +202,13 @@ class DonutDataset(Dataset):
                         self.add_tokens([rf"<s_{k}>", rf"</s_{k}>"])
                     output += (
                         rf"<s_{k}>"
-                        + self.json2token(
-                            obj[k], update_special_tokens_for_json_key, sort_json_key
-                        )
+                        + self.json2token(obj[k], update_special_tokens_for_json_key, sort_json_key)
                         + rf"</s_{k}>"
                     )
                 return output
         elif type(obj) == list:
             return r"<sep/>".join(
-                [
-                    self.json2token(
-                        item, update_special_tokens_for_json_key, sort_json_key
-                    )
-                    for item in obj
-                ]
+                [self.json2token(item, update_special_tokens_for_json_key, sort_json_key) for item in obj]
             )
         else:
             obj = str(obj)
@@ -238,8 +227,6 @@ class DonutDataset(Dataset):
 
     def __len__(self) -> int:
         return self.dataset_length
-
-
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
@@ -267,17 +254,13 @@ class DonutDataset(Dataset):
 
         # Process the image using the processor
         # 'random_padding' is enabled for training to introduce variability
-        pixel_values = processor(
-            image,
-            random_padding=self.split == "train",
-            return_tensors="pt"
-        ).pixel_values
+        pixel_values = processor(image, random_padding=self.split == "train", return_tensors="pt").pixel_values
         # Remove any extra dimensions added by the processor
         pixel_values = pixel_values.squeeze()
 
         # Randomly select one target sequence from the available ground truth sequences for this sample
         target_sequence = random.choice(self.gt_token_sequences[idx])
-        
+
         # Tokenize the target sequence without adding special tokens
         # The sequence is padded or truncated to 'max_length' and converted into a tensor
         input_ids = processor.tokenizer(
@@ -309,7 +292,9 @@ class PushToHubCallback(Callback):
         print(f"Pushing model to the hub, epoch {trainer.current_epoch}")
 
         # Save model locally
-        epoch_subfolder = os.path.join(self.save_dir, f"{self.model_output_name}_{self.dataset_subset}_epoch{trainer.current_epoch}")
+        epoch_subfolder = os.path.join(
+            self.save_dir, f"{self.model_output_name}_{self.dataset_subset}_epoch{trainer.current_epoch}"
+        )
         pl_module.model.save_pretrained(epoch_subfolder)
         pl_module.processor.save_pretrained(epoch_subfolder)
 
@@ -320,7 +305,7 @@ class PushToHubCallback(Callback):
             path_in_repo=self.dataset_subset,
             repo_id=repo_id,
             repo_type="model",
-            commit_message=f"Training in progress, epoch {trainer.current_epoch}"
+            commit_message=f"Training in progress, epoch {trainer.current_epoch}",
         )
 
         # Upload extra files
@@ -336,14 +321,14 @@ class PushToHubCallback(Callback):
         pl_module.processor.save_pretrained(final_model_dir)
 
         repo_id = f"de-Rodrigo/{self.model_output_name}"
-        
+
         # Upload model to the hub
         self.api.upload_folder(
             folder_path=final_model_dir,
             path_in_repo=self.dataset_subset,
             repo_id=repo_id,
             repo_type="model",
-            commit_message="Training done, final model uploaded"
+            commit_message="Training done, final model uploaded",
         )
 
         # Upload extra files
@@ -355,13 +340,13 @@ class PushToHubCallback(Callback):
             print(f"Uploading {file} to {repo_id}")
             self.api.upload_file(
                 path_or_fileobj=file,
-                path_in_repo='/'.join(file.split('/')[4:]),
+                path_in_repo="/".join(file.split("/")[4:]),
                 repo_id=repo_id,
                 repo_type="model",
-                commit_message="Uploading additional files"
+                commit_message="Uploading additional files",
             )
 
-        
+
 def load_session_datasets(dataset_name: str, subset: str = ""):
 
     train_dataset = DonutDataset(
@@ -388,11 +373,12 @@ def load_session_datasets(dataset_name: str, subset: str = ""):
 
 
 def load_secret_dataset(dataset_name: str, subsets: list):
-    
+
     train_datasets = []
     val_datasets = []
-    
+
     for subset in subsets:
+        print(subset)
         train_ds = DonutDataset(
             dataset_name,
             subset=subset,
@@ -416,7 +402,7 @@ def load_secret_dataset(dataset_name: str, subsets: list):
 
     train_dataset = ConcatDataset(train_datasets)
     val_dataset = ConcatDataset(val_datasets)
-    
+
     return train_dataset, val_dataset
 
 
@@ -426,7 +412,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--debug", type=str)
     parser.add_argument("--dataset_name", type=str)
-    parser.add_argument("--dataset_subsets", type=str, action='append')
+    parser.add_argument("--dataset_subsets", type=str, action="append")
     args = parser.parse_args()
 
     # Debug
@@ -438,7 +424,7 @@ if __name__ == "__main__":
     # Define constants
     dataset = args.dataset_name
     dataset_subsets = args.dataset_subsets
-    model_output_name = "".join(["donut-", dataset.split('/')[-1]])
+    model_output_name = "".join(["donut-", dataset.split("/")[-1]])
 
     login(token=os.getenv("HUGGINGFACE_HUB_TOKEN"))
 
@@ -451,18 +437,27 @@ if __name__ == "__main__":
     config.decoder.max_length = max_length
 
     processor = DonutProcessor.from_pretrained("naver-clova-ix/donut-base")
-    model = VisionEncoderDecoderModel.from_pretrained(
-        "naver-clova-ix/donut-base", config=config
-    )
+    model = VisionEncoderDecoderModel.from_pretrained("naver-clova-ix/donut-base", config=config)
 
     # Dataset instances
     processor.image_processor.size = image_size[::-1]
     processor.image_processor.do_align_long_axis = False
 
     if dataset == "de-Rodrigo/merit-secret":
-        subsets_disponibles = ['britanico', 'fomento', 'maravillas', 'mater', 'montealto', 'pilar', 'recuerdo', 'retamar', 'sanpablo', 'sanpatricio']
+        subsets_disponibles = [
+            "britanico",
+            "fomento",
+            "maravillas",
+            "mater",
+            "montealto",
+            "pilar",
+            "recuerdo",
+            "retamar",
+            "sanpablo",
+            "sanpatricio",
+        ]
         train_dataset, val_dataset = load_secret_dataset(dataset, subsets_disponibles)
-    
+
     else:
 
         train_dataset = []
@@ -472,25 +467,21 @@ if __name__ == "__main__":
             train_ds, val_ds = load_session_datasets(dataset_name=dataset, subset=subset)
             train_dataset.append(train_ds)
             val_dataset.append(val_ds)
-        
+
         train_dataset = ConcatDataset(train_dataset)
         val_dataset = ConcatDataset(val_dataset)
 
     model.config.pad_token_id = processor.tokenizer.pad_token_id
-    model.config.decoder_start_token_id = processor.tokenizer.convert_tokens_to_ids(
-        ["<s_cord-v2>"]
-    )[0]
+    model.config.decoder_start_token_id = processor.tokenizer.convert_tokens_to_ids(["<s_cord-v2>"])[0]
 
     # Dataloaders
     train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=4)
-    
+
     percentage = 0.1
     num_samples = int(len(val_dataset) * percentage)
     indices = torch.randperm(len(val_dataset))[:num_samples].tolist()
     sampler = SubsetRandomSampler(indices)
     val_dataloader = DataLoader(val_dataset, batch_size=1, sampler=sampler, num_workers=4)
-
-
 
     # Train
     config = {
@@ -513,9 +504,7 @@ if __name__ == "__main__":
     wandb.login(key=os.getenv("WANDB_API_KEY"))
     wandb_logger = WandbLogger(project="Donut", name="_".join(dataset_subsets))
 
-    early_stop_callback = EarlyStopping(
-        monitor="val_edit_distance", patience=4, verbose=False, mode="min"
-    )
+    early_stop_callback = EarlyStopping(monitor="val_edit_distance", patience=4, verbose=False, mode="min")
 
     trainer = pl.Trainer(
         accelerator="gpu",
