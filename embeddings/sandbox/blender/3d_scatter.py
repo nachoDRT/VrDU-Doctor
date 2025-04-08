@@ -2,6 +2,9 @@ import bpy
 import pandas as pd
 import os
 import mathutils
+from sklearn.svm import LinearSVC
+import pickle
+
 
 FACTOR = 0.219938
 COLORS = [(0.069, 0.35, 1, 1), (0.475, 0, 1, 1), (0.069, 0.35, 1, 0.75)]
@@ -645,6 +648,18 @@ def create_plane_from_hyperplane(w, b, size=10):
 def show_planes(feature: str):
 
     data = load_data("planes")
+    model_path = bpy.path.abspath(f"//plots/model_{feature}.npz")
+    print(model_path)
+
+    with open(model_path, "rb") as f:
+        model_data = pickle.load(f)
+
+    clf_ = LinearSVC()
+    clf_.classes_ = model_data["classes"]
+    clf_.coef_ = model_data["coef"]
+    clf_.intercept_ = model_data["intercept"]
+
+    # print(clf_.predict([[-0.8, -1, 3]]))
 
     for _, row in data[feature].iterrows():
         w = [row["w1"], row["w2"], row["w3"]]
