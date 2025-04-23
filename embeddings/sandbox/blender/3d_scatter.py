@@ -50,7 +50,8 @@ FEATURES = [
 def get_samples_materials():
     blue_mat = None  # bpy.data.materials.get("BlueMaterial")
     green_mat = None  # bpy.data.materials.get("GreenMaterial")
-    materials = [blue_mat, green_mat]
+    material_synth_prox = None
+    materials = [blue_mat, green_mat, material_synth_prox]
 
     for i, material in enumerate(materials):
         if material is None:
@@ -677,9 +678,9 @@ def show_planes():
             bpy.context.scene.collection.objects.unlink(plane_obj)
 
 
-def new_samples_target_features():
+def new_samples_target_features(target_name):
 
-    target_obj = bpy.data.objects.get("new_samples_target")
+    target_obj = bpy.data.objects.get(target_name)
     target_features = {}
 
     if target_obj:
@@ -706,9 +707,79 @@ def new_samples_target_features():
         else:
             target_features[key] = pred
 
-    print(target_features)
+    print(target_features.keys())
+    print(target_features.values())
 
     return target_features
+
+
+def get_trajectory_intersections(epsilon=1e-6):
+    """
+    Count how many plane meshes are intersected by the line segment
+    between two target objects in the scene.
+    """
+
+    # Gather all collections whose names start with "cluster_division_"
+    plane_collections = [coll for coll in bpy.data.collections if coll.name.startswith("cluster_division_")]
+
+    # Retrieve the two endpoint objects for the trajectory
+    obj_a = bpy.data.objects["new_samples_target"]
+    obj_b = bpy.data.objects["new_samples_target_"]
+
+    new_samples_target_features("new_samples_target")
+    new_samples_target_features("new_samples_target_")
+
+    # Collect all mesh objects (planes) from those collections
+    planes = []
+    for coll in plane_collections:
+        planes.extend([obj for obj in coll.objects if obj.type == "MESH"])
+
+    # Define the segment endpoints in world space
+    P1 = obj_a.location if hasattr(obj_a, "location") else obj_a
+    P2 = obj_b.location if hasattr(obj_b, "location") else obj_b
+    d = P2 - P1  # direction vector from P1 to P2
+
+    count = 0
+
+    for plane in planes:
+
+        # Compute the plane normal in world space (local Z axis → world)
+        normal = plane.matrix_world.to_3x3() @ mathutils.Vector((0, 0, 1))
+        normal.normalize()
+        P0 = plane.matrix_world.translation  # a point on the plane
+
+        # Check for near-parallelism: if denom ≈ 0, no intersection
+        denom = normal.dot(d)
+        if abs(denom) < epsilon:
+            continue
+
+        # Compute the intersection parameter t along the segment
+        t = normal.dot(P0 - P1) / denom
+        if not (0.0 <= t <= 1.0):
+            # Intersection lies outside the segment
+            continue
+
+        # Calculate the intersection point in world coordinates
+        intersec_world = P1 + t * d
+
+        # Transform the intersection point into the plane’s local space
+        intersec_local = plane.matrix_world.inverted() @ intersec_world
+
+        # Get the plane’s local bounding box corners to find min/max X and Y
+        local_corners = [mathutils.Vector(corner) for corner in plane.bound_box]
+        xs = [v.x for v in local_corners]
+        ys = [v.y for v in local_corners]
+        min_x, max_x = min(xs), max(xs)
+        min_y, max_y = min(ys), max(ys)
+
+        # If the local intersection point falls inside the bounding box, count it
+        if (
+            min_x - epsilon <= intersec_local.x <= max_x + epsilon
+            and min_y - epsilon <= intersec_local.y <= max_y + epsilon
+        ):
+            count += 1
+
+    return count
 
 
 if __name__ == "__main__":
@@ -716,16 +787,25 @@ if __name__ == "__main__":
     # animate_synthetic_transformations()
 
     # show_real_samples_by_proximity("es-render-seq", include_synth=True)
-    show_real_samples_by_f1("es-render-seq", include_synth=False)
+    # show_real_samples_by_f1("es-digital-seq", include_synth=False)
 
     # TODO
     # show_real_samples_by_feature()
 
     # show_planes()
 
-    materials = get_samples_materials()
-    data = load_data("position")
-    subset = "es-render-seq"
-    synth_samples_scatter_plot(data[subset], materials[1], collection_name_detail=subset)
+    """Plot a specific synth subset"""
+    # materials = get_samples_materials()
+    # data = load_data("position")
+    # subset = "es-render-seq"
+    # synth_samples_scatter_plot(data[subset], materials[1], collection_name_detail=subset)
 
-    new_samples_target_features()
+    """ Get the features from the position of the target object """
+    # new_samples_target_features("new_samples_target")
+
+    """ Get the number of intersections between the trajectory AB and the planes it trespasses"""
+    num_planes = get_trajectory_intersections()
+    print(f"Num of planes trespassed: {num_planes}")
+
+    # """ Get wormhole maps"""
+    # get_wormholes()
