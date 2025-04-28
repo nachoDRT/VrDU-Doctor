@@ -43,6 +43,7 @@ embeddings/sandbox/donut
 embeddings/aux-datasets/IIT-CDIP
 embeddings/aux-datasets/data/IIT-CDIP
 embeddings/sandbox/blender/results
+embeddings/sandbox/blender/wormholes
 embeddings/aux-datasets/data
 
 embeddings/aux-datasets/config/hf_config.json

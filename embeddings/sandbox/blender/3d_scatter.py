@@ -4,7 +4,9 @@ import os
 import mathutils
 from sklearn.svm import LinearSVC
 import pickle
-
+import numpy as np
+from tqdm import tqdm
+from PIL import Image, ImageDraw, ImageFont
 
 FACTOR = 0.219938
 COLORS = [(0.069, 0.35, 1, 1), (0.475, 0, 1, 1), (0.069, 0.35, 1, 0.75)]
@@ -678,16 +680,22 @@ def show_planes():
             bpy.context.scene.collection.objects.unlink(plane_obj)
 
 
-def new_samples_target_features(target_name):
+def new_samples_target_features(target_name: str = None, location: list = None, refactor: bool = False):
 
-    target_obj = bpy.data.objects.get(target_name)
     target_features = {}
 
-    if target_obj:
-        coords = target_obj.location
-        location = [coords[0] / FACTOR, coords[1] / FACTOR, coords[2] / FACTOR]
+    if target_name:
+
+        target_obj = bpy.data.objects.get(target_name)
+
+        if target_obj:
+            coords = target_obj.location
+            location = [coords[0] / FACTOR, coords[1] / FACTOR, coords[2] / FACTOR]
 
     data = load_data("planes")
+
+    if refactor:
+        location = [location[0] / FACTOR, location[1] / FACTOR, location[2] / FACTOR]
 
     for key in data.keys():
         model_path = bpy.path.abspath(f"//plots/model_{key}.npz")
@@ -707,8 +715,8 @@ def new_samples_target_features(target_name):
         else:
             target_features[key] = pred
 
-    print(target_features.keys())
-    print(target_features.values())
+    # print(target_features.keys())
+    # print(target_features.values())
 
     return target_features
 
@@ -782,6 +790,86 @@ def get_trajectory_intersections(epsilon=1e-6):
     return count
 
 
+def get_wormholes():
+
+    locations = [
+        [-0.478442, -0.126421, 0.042499],
+        [-0.434911, -0.06416, 0.040134],
+        [-0.337233, -0.053492, 0.033737],
+        [-0.274475, -0.199495, 0.100121],
+        [-0.280348, 0.096851, 0.055897],
+        [-0.298252, -0.059917, -0.089182],
+        [-0.220635, -0.111718, 0.052648],
+        [-0.02056, -0.190775, 0.059267],
+        [0.006347, -0.147072, -0.045323],
+        [0.197503, -0.200955, 0.011175],
+    ]
+
+    for id, location in enumerate(locations):
+
+        target_features = list(new_samples_target_features(location=location, refactor=True).values())
+        print(f"Target features: {target_features}")
+
+        grid_step = 0.2
+        slicer_step = 0.1
+
+        x_min, x_max = -4.0, 4.0
+        y_min, y_max = -2.0, 3.0
+        # z_min, z_max = -2.0, 2.0
+        z_min, z_max = 0.4, 0.5
+        square_size = 30
+
+        xs = np.arange(x_min, x_max, grid_step)
+        ys = np.flip(np.arange(y_min, y_max, grid_step))
+        zs = np.arange(z_min, z_max, slicer_step)
+        nx, ny = xs.size, ys.size
+
+        for iz, z in enumerate(tqdm(zs, desc="Processing slices")):
+
+            w = nx * square_size
+            h = ny * square_size
+            canvas = np.zeros((h, w, 3), dtype=np.uint8)
+
+            for iy, y in enumerate(ys):
+                for ix, x in enumerate(xs):
+
+                    grid_features = list(new_samples_target_features(location=[x, y, z]).values())
+                    changes = sum(1 for a, b in zip(target_features, grid_features) if a != b)
+
+                    if changes == 0:
+                        color = (0, 255, 0)
+                    elif changes == 1:
+                        color = (0, 0, 255)
+                    elif changes == 2:
+                        color = (0, 0, 0)
+                    else:
+                        color = (255, 0, 0)
+
+                    y0, y1 = iy * square_size, iy * square_size + square_size
+                    x0, x1 = ix * square_size, ix * square_size + square_size
+                    canvas[y0:y1, x0:x1] = color
+
+            img = Image.fromarray(canvas)
+            draw = ImageDraw.Draw(img)
+            try:
+                font = ImageFont.truetype("DejaVuSansMono.ttf", size=7)
+            except Exception:
+                font = ImageFont.load_default()
+
+            for iy, y in enumerate(ys):
+                for ix, x in enumerate(xs):
+                    x0, y0 = ix * square_size, iy * square_size
+                    text = f"({x:.1f},\n{y:.1f})"
+                    draw.text((x0 + 1, y0 + 1), text, fill=(255, 255, 255), font=font)
+
+            filename = f"wormhole_map_{id}_z_{iz}_{z:.2f}.png"
+            filepath = bpy.path.abspath(f"//wormholes/{filename}")
+            out_dir = os.path.dirname(filepath)
+            os.makedirs(out_dir, exist_ok=True)
+            img.save(filepath)
+            print(f"Saved slice at z={z:.2f} → {filepath}")
+
+
 if __name__ == "__main__":
 
     # animate_synthetic_transformations()
@@ -804,8 +892,8 @@ if __name__ == "__main__":
     # new_samples_target_features("new_samples_target")
 
     """ Get the number of intersections between the trajectory AB and the planes it trespasses"""
-    num_planes = get_trajectory_intersections()
-    print(f"Num of planes trespassed: {num_planes}")
+    # num_planes = get_trajectory_intersections()
+    # print(f"Num of planes trespassed: {num_planes}")
 
     # """ Get wormhole maps"""
-    # get_wormholes()
+    get_wormholes()
