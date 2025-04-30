@@ -47,3 +47,7 @@ embeddings/sandbox/blender/wormholes
 embeddings/aux-datasets/data
 
 embeddings/aux-datasets/config/hf_config.json
+
+embeddings/sandbox/explainability/data/donut_finetuned_real_de_Rodrigo_merit_secret_all_averaged_embeddings.csv
+
+embeddings/sandbox/explainability/data/de_Rodrigo_merit_secret_all_embeddings.csv
