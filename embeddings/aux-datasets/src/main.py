@@ -105,6 +105,37 @@ def get_subset_from_hub(dataset_name: str):
     return {"image": images_bytes, "ground_truth": ground_truths}
 
 
+def get_aux_synth_dataset(dataset_name: str):
+
+    images_bytes = []
+    ground_truths = []
+
+    root_path = dirname(dirname(abspath(__file__)))
+    base_path = join(root_path, "data", dataset_name, "dataset_output", "images")
+
+    i = 0
+
+    for current_root, dirs, files in os.walk(base_path):
+        for file in sorted(files):
+            if file.lower().endswith(".png"):
+                png_path = os.path.join(current_root, file)
+                try:
+                    with open(png_path, "rb") as f:
+                        png_bytes = f.read()
+                    images_bytes.append(png_bytes)
+                    ground_truths.append({"-": "-"})
+                    i += 1
+                    if i >= SAMPLES_LIMIT:
+                        break
+                except Exception as e:
+                    print(f"Warning: Unable to process image {png_path}. Error: {e}")
+                    continue
+        if i >= SAMPLES_LIMIT:
+            break
+
+    return {"image": images_bytes, "ground_truth": ground_truths}
+
+
 if __name__ == "__main__":
 
     # Parse arguments
@@ -121,6 +152,10 @@ if __name__ == "__main__":
 
     elif dataset_name == "PDFA" or dataset_name == "IDL":
         subset = get_subset_from_hub(dataset_name)
+
+    elif "-".join(dataset_name.split("-")[1:]) == "asc-synth":
+        subset = get_aux_synth_dataset(dataset_name)
+
     else:
         print(f"{dataset_name} implementation is not available")
 

@@ -4,7 +4,9 @@ import os
 import mathutils
 from sklearn.svm import LinearSVC
 import pickle
-
+import numpy as np
+from tqdm import tqdm
+from PIL import Image, ImageDraw, ImageFont
 
 FACTOR = 0.219938
 COLORS = [(0.069, 0.35, 1, 1), (0.475, 0, 1, 1), (0.069, 0.35, 1, 0.75)]
@@ -50,7 +52,8 @@ FEATURES = [
 def get_samples_materials():
     blue_mat = None  # bpy.data.materials.get("BlueMaterial")
     green_mat = None  # bpy.data.materials.get("GreenMaterial")
-    materials = [blue_mat, green_mat]
+    material_synth_prox = None
+    materials = [blue_mat, green_mat, material_synth_prox]
 
     for i, material in enumerate(materials):
         if material is None:
@@ -129,8 +132,8 @@ def real_samples_scatter_plot(df, mat):
     scatter_plot("real_samples", df, mat)
 
 
-def synth_samples_scatter_plot(df, mat):
-    scatter_plot("synthetic_samples", df, mat, keyframes=True, r=0.01)
+def synth_samples_scatter_plot(df, mat, collection_name_detail: str = ""):
+    scatter_plot(f"synthetic_samples_{collection_name_detail}", df, mat, keyframes=True, r=0.01)
 
 
 def get_blender_name(excel_name: str) -> str:
@@ -383,7 +386,7 @@ def animate_synthetic_transformations():
     """
 
     materials = get_samples_materials()
-    data = load_data()
+    data = load_data("position")
 
     real_samples_scatter_plot(data["real"], materials[0])
     synth_samples_scatter_plot(data["es-digital-line"], materials[1])
@@ -438,7 +441,7 @@ def show_real_samples_by_f1(synth_version: str, include_synth: bool = False):
     data_f1 = load_data("f1")
 
     real_samples_as_gradient(
-        collection_name="real_samples_proximity_gradient",
+        collection_name=f"real_samples_f1_gradient_{synth_version}",
         data_to_plot=data_pos["real"],
         colored_by=data_f1["f1"],
         grad_key=synth_version,
@@ -512,7 +515,7 @@ def real_samples_as_gradient(
                 GRADIENT_GREEN,
             )
 
-        mat_name = f"GradientMat_{index}"
+        mat_name = f"GradientMat_{collection_name}_{index}"
         mat = bpy.data.materials.new(name=mat_name)
         mat.use_nodes = True
         bsdf = mat.node_tree.nodes.get("Principled BSDF")
@@ -644,27 +647,227 @@ def create_plane_from_hyperplane(w, b, size=10):
     else:
         plane.data.materials.append(mat)
 
+    return plane
 
-def show_planes(feature: str):
+
+def show_planes():
 
     data = load_data("planes")
-    model_path = bpy.path.abspath(f"//plots/model_{feature}.npz")
-    print(model_path)
 
-    with open(model_path, "rb") as f:
-        model_data = pickle.load(f)
+    for key, values in data.items():
 
-    clf_ = LinearSVC()
-    clf_.classes_ = model_data["classes"]
-    clf_.coef_ = model_data["coef"]
-    clf_.intercept_ = model_data["intercept"]
+        collection_name = f"cluster_division_{key}"
+        new_collection = bpy.data.collections.new(collection_name)
+        bpy.context.scene.collection.children.link(new_collection)
 
-    # print(clf_.predict([[-0.8, -1, 3]]))
+        model_path = bpy.path.abspath(f"//plots/model_{key}.npz")
 
-    for _, row in data[feature].iterrows():
-        w = [row["w1"], row["w2"], row["w3"]]
-        b = row["b"]
-        create_plane_from_hyperplane(w, b)
+        with open(model_path, "rb") as f:
+            model_data = pickle.load(f)
+
+        clf_ = LinearSVC()
+        clf_.classes_ = model_data["classes"]
+        clf_.coef_ = model_data["coef"]
+        clf_.intercept_ = model_data["intercept"]
+
+        # print(clf_.predict([[-0.8, -1, 3]]))
+
+        for _, row in data[key].iterrows():
+            w = [row["w1"], row["w2"], row["w3"]]
+            b = row["b"]
+            plane_obj = create_plane_from_hyperplane(w, b)
+            new_collection.objects.link(plane_obj)
+            bpy.context.scene.collection.objects.unlink(plane_obj)
+
+
+def new_samples_target_features(target_name: str = None, location: list = None, refactor: bool = False):
+
+    target_features = {}
+
+    if target_name:
+
+        target_obj = bpy.data.objects.get(target_name)
+
+        if target_obj:
+            coords = target_obj.location
+            location = [coords[0] / FACTOR, coords[1] / FACTOR, coords[2] / FACTOR]
+
+    data = load_data("planes")
+
+    if refactor:
+        location = [location[0] / FACTOR, location[1] / FACTOR, location[2] / FACTOR]
+
+    for key in data.keys():
+        model_path = bpy.path.abspath(f"//plots/model_{key}.npz")
+
+        with open(model_path, "rb") as f:
+            model_data = pickle.load(f)
+
+        clf_ = LinearSVC()
+        clf_.classes_ = model_data["classes"]
+        clf_.coef_ = model_data["coef"]
+        clf_.intercept_ = model_data["intercept"]
+
+        pred = clf_.predict([location])[0]
+
+        if hasattr(pred, "item"):
+            target_features[key] = pred.item()
+        else:
+            target_features[key] = pred
+
+    # print(target_features.keys())
+    # print(target_features.values())
+
+    return target_features
+
+
+def get_trajectory_intersections(epsilon=1e-6):
+    """
+    Count how many plane meshes are intersected by the line segment
+    between two target objects in the scene.
+    """
+
+    # Gather all collections whose names start with "cluster_division_"
+    plane_collections = [coll for coll in bpy.data.collections if coll.name.startswith("cluster_division_")]
+
+    # Retrieve the two endpoint objects for the trajectory
+    obj_a = bpy.data.objects["new_samples_target"]
+    obj_b = bpy.data.objects["new_samples_target_"]
+
+    new_samples_target_features("new_samples_target")
+    new_samples_target_features("new_samples_target_")
+
+    # Collect all mesh objects (planes) from those collections
+    planes = []
+    for coll in plane_collections:
+        planes.extend([obj for obj in coll.objects if obj.type == "MESH"])
+
+    # Define the segment endpoints in world space
+    P1 = obj_a.location if hasattr(obj_a, "location") else obj_a
+    P2 = obj_b.location if hasattr(obj_b, "location") else obj_b
+    d = P2 - P1  # direction vector from P1 to P2
+
+    count = 0
+
+    for plane in planes:
+
+        # Compute the plane normal in world space (local Z axis → world)
+        normal = plane.matrix_world.to_3x3() @ mathutils.Vector((0, 0, 1))
+        normal.normalize()
+        P0 = plane.matrix_world.translation  # a point on the plane
+
+        # Check for near-parallelism: if denom ≈ 0, no intersection
+        denom = normal.dot(d)
+        if abs(denom) < epsilon:
+            continue
+
+        # Compute the intersection parameter t along the segment
+        t = normal.dot(P0 - P1) / denom
+        if not (0.0 <= t <= 1.0):
+            # Intersection lies outside the segment
+            continue
+
+        # Calculate the intersection point in world coordinates
+        intersec_world = P1 + t * d
+
+        # Transform the intersection point into the plane’s local space
+        intersec_local = plane.matrix_world.inverted() @ intersec_world
+
+        # Get the plane’s local bounding box corners to find min/max X and Y
+        local_corners = [mathutils.Vector(corner) for corner in plane.bound_box]
+        xs = [v.x for v in local_corners]
+        ys = [v.y for v in local_corners]
+        min_x, max_x = min(xs), max(xs)
+        min_y, max_y = min(ys), max(ys)
+
+        # If the local intersection point falls inside the bounding box, count it
+        if (
+            min_x - epsilon <= intersec_local.x <= max_x + epsilon
+            and min_y - epsilon <= intersec_local.y <= max_y + epsilon
+        ):
+            count += 1
+
+    return count
+
+
+def get_wormholes():
+
+    locations = [
+        [-0.478442, -0.126421, 0.042499],
+        [-0.434911, -0.06416, 0.040134],
+        [-0.337233, -0.053492, 0.033737],
+        [-0.274475, -0.199495, 0.100121],
+        [-0.280348, 0.096851, 0.055897],
+        [-0.298252, -0.059917, -0.089182],
+        [-0.220635, -0.111718, 0.052648],
+        [-0.02056, -0.190775, 0.059267],
+        [0.006347, -0.147072, -0.045323],
+        [0.197503, -0.200955, 0.011175],
+    ]
+
+    for id, location in enumerate(locations):
+
+        target_features = list(new_samples_target_features(location=location, refactor=True).values())
+        print(f"Target features: {target_features}")
+
+        grid_step = 0.2
+        slicer_step = 0.1
+
+        x_min, x_max = -4.0, 4.0
+        y_min, y_max = -2.0, 3.0
+        # z_min, z_max = -2.0, 2.0
+        z_min, z_max = 0.4, 0.5
+        square_size = 30
+
+        xs = np.arange(x_min, x_max, grid_step)
+        ys = np.flip(np.arange(y_min, y_max, grid_step))
+        zs = np.arange(z_min, z_max, slicer_step)
+        nx, ny = xs.size, ys.size
+
+        for iz, z in enumerate(tqdm(zs, desc="Processing slices")):
+
+            w = nx * square_size
+            h = ny * square_size
+            canvas = np.zeros((h, w, 3), dtype=np.uint8)
+
+            for iy, y in enumerate(ys):
+                for ix, x in enumerate(xs):
+
+                    grid_features = list(new_samples_target_features(location=[x, y, z]).values())
+                    changes = sum(1 for a, b in zip(target_features, grid_features) if a != b)
+
+                    if changes == 0:
+                        color = (0, 255, 0)
+                    elif changes == 1:
+                        color = (0, 0, 255)
+                    elif changes == 2:
+                        color = (0, 0, 0)
+                    else:
+                        color = (255, 0, 0)
+
+                    y0, y1 = iy * square_size, iy * square_size + square_size
+                    x0, x1 = ix * square_size, ix * square_size + square_size
+                    canvas[y0:y1, x0:x1] = color
+
+            img = Image.fromarray(canvas)
+            draw = ImageDraw.Draw(img)
+            try:
+                font = ImageFont.truetype("DejaVuSansMono.ttf", size=7)
+            except Exception:
+                font = ImageFont.load_default()
+
+            for iy, y in enumerate(ys):
+                for ix, x in enumerate(xs):
+                    x0, y0 = ix * square_size, iy * square_size
+                    text = f"({x:.1f},\n{y:.1f})"
+                    draw.text((x0 + 1, y0 + 1), text, fill=(255, 255, 255), font=font)
+
+            filename = f"wormhole_map_{id}_z_{iz}_{z:.2f}.png"
+            filepath = bpy.path.abspath(f"//wormholes/{filename}")
+            out_dir = os.path.dirname(filepath)
+            os.makedirs(out_dir, exist_ok=True)
+            img.save(filepath)
+            print(f"Saved slice at z={z:.2f} → {filepath}")
 
 
 if __name__ == "__main__":
@@ -672,9 +875,25 @@ if __name__ == "__main__":
     # animate_synthetic_transformations()
 
     # show_real_samples_by_proximity("es-render-seq", include_synth=True)
-    # show_real_samples_by_f1("es-render-seq", include_synth=True)
+    # show_real_samples_by_f1("es-digital-seq", include_synth=False)
 
     # TODO
     # show_real_samples_by_feature()
 
-    show_planes("v_density")
+    # show_planes()
+
+    """Plot a specific synth subset"""
+    # materials = get_samples_materials()
+    # data = load_data("position")
+    # subset = "es-render-seq"
+    # synth_samples_scatter_plot(data[subset], materials[1], collection_name_detail=subset)
+
+    """ Get the features from the position of the target object """
+    # new_samples_target_features("new_samples_target")
+
+    """ Get the number of intersections between the trajectory AB and the planes it trespasses"""
+    # num_planes = get_trajectory_intersections()
+    # print(f"Num of planes trespassed: {num_planes}")
+
+    # """ Get wormhole maps"""
+    get_wormholes()
