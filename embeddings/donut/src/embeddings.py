@@ -200,6 +200,9 @@ def get_visual_embeddings(dataset_iterator, non_decoded_dataset_iterator, subset
             # Extract the attention values for the [CLS] token + Normalization
             # weights.shape -> torch.Size([48, 100])
             weights = avg_attention[:, 0, :]
+            # Normalize the weights
+            weights = weights / weight_strength
+            weights = softmax(weights, dim=-1)
 
             # We need to flatten weights to a shape that aligns with the 4800 tokens.
             # Flatten weights to get shape: torch.Size([4800])
@@ -340,6 +343,8 @@ def save_csv(embeddings, version: str):
         )
 
     csv_path = os.path.join(RESULTS_DIR, file_name)
+
+    os.makedirs(os.path.dirname(csv_path), exist_ok=True)
 
     with open(csv_path, mode="w", newline="") as csv_file:
         writer = csv.writer(csv_file)
@@ -552,15 +557,27 @@ if __name__ == "__main__":
         max_samples = None
 
     if loop:
+        # subsets_to_process = [
+        #     ("de-Rodrigo/merit-aux", "IIT-CDIP", "train"),
+        #     ("de-Rodrigo/merit-secret", "all", "test"),
+        #     ("de-Rodrigo/merit", "es-digital-paragraph-degradation-seq", "train"),
+        #     ("de-Rodrigo/merit", "es-digital-line-degradation-seq", "train"),
+        #     ("de-Rodrigo/merit", "es-digital-seq", "train"),
+        #     ("de-Rodrigo/merit", "es-digital-rotation-degradation-seq", "train"),
+        #     ("de-Rodrigo/merit", "es-digital-zoom-degradation-seq", "train"),
+        #     ("de-Rodrigo/merit", "es-render-seq", "train"),
+        # ]
         subsets_to_process = [
-            ("de-Rodrigo/merit-aux", "IIT-CDIP", "train"),
-            ("de-Rodrigo/merit-secret", "all", "test"),
-            ("de-Rodrigo/merit", "es-digital-paragraph-degradation-seq", "train"),
-            ("de-Rodrigo/merit", "es-digital-line-degradation-seq", "train"),
-            ("de-Rodrigo/merit", "es-digital-seq", "train"),
-            ("de-Rodrigo/merit", "es-digital-rotation-degradation-seq", "train"),
-            ("de-Rodrigo/merit", "es-digital-zoom-degradation-seq", "train"),
-            ("de-Rodrigo/merit", "es-render-seq", "train"),
+            ("de-Rodrigo/merit-aux", "britanico-asc-synth", "train"),
+            ("de-Rodrigo/merit-aux", "fomento-asc-synth", "train"),
+            ("de-Rodrigo/merit-aux", "maravillas-asc-synth", "train"),
+            ("de-Rodrigo/merit-aux", "mater-asc-synth", "train"),
+            ("de-Rodrigo/merit-aux", "montealto-asc-synth", "train"),
+            ("de-Rodrigo/merit-aux", "pilar-asc-synth", "train"),
+            ("de-Rodrigo/merit-aux", "recuerdo-asc-synth", "train"),
+            ("de-Rodrigo/merit-aux", "retamar-asc-synth", "train"),
+            ("de-Rodrigo/merit-aux", "sanpablo-asc-synth", "train"),
+            ("de-Rodrigo/merit-aux", "sanpatricio-asc-synth", "train")
         ]
 
     for dataset_name, subset_name, split in subsets_to_process:
