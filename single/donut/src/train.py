@@ -16,9 +16,8 @@ from transformers import (
     VisionEncoderDecoderModel,
 )
 from typing import Any, List, Tuple
-from torch.utils.data import DataLoader, SubsetRandomSampler, ConcatDataset
+from torch.utils.data import DataLoader, SubsetRandomSampler, ConcatDataset, Dataset
 from nltk import edit_distance
-from torch.utils.data import Dataset, ConcatDataset
 from pytorch_lightning.callbacks import EarlyStopping, Callback
 from pytorch_lightning.loggers import WandbLogger
 from PIL import Image
@@ -420,6 +419,27 @@ def load_secret_dataset(dataset_name: str, subsets: list):
     return train_dataset, val_dataset
 
 
+def load_secret_dataset_as_validation(dataset_name: str, subsets: list):
+    
+    val_datasets = []
+    
+    for subset in subsets:
+        val_ds = DonutDataset(
+            dataset_name,
+            subset=subset,
+            max_length=max_length,
+            split="test",
+            task_start_token="<s_cord-v2>",
+            prompt_end_token="<s_cord-v2>",
+            sort_json_key=False,
+        )
+        val_datasets.append(val_ds)
+
+    val_dataset = ConcatDataset(val_datasets)
+    
+    return val_dataset
+
+
 if __name__ == "__main__":
 
     # Define parsing values
@@ -427,6 +447,7 @@ if __name__ == "__main__":
     parser.add_argument("--debug", type=str)
     parser.add_argument("--dataset_name", type=str)
     parser.add_argument("--dataset_subsets", type=str, action='append')
+    parser.add_argument("--test_real", action="store_true", default=False)
     args = parser.parse_args()
 
     # Debug
@@ -438,6 +459,7 @@ if __name__ == "__main__":
     # Define constants
     dataset = args.dataset_name
     dataset_subsets = args.dataset_subsets
+    test_real = args.test_real
     model_output_name = "".join(["donut-", dataset.split('/')[-1]])
 
     login(token=os.getenv("HUGGINGFACE_HUB_TOKEN"))
@@ -476,6 +498,11 @@ if __name__ == "__main__":
         train_dataset = ConcatDataset(train_dataset)
         val_dataset = ConcatDataset(val_dataset)
 
+        if test_real:
+            dataset = "de-Rodrigo/merit-secret"
+            subsets_disponibles = ['britanico', 'fomento', 'maravillas', 'mater', 'montealto', 'pilar', 'recuerdo', 'retamar', 'sanpablo', 'sanpatricio']
+            val_dataset = load_secret_dataset_as_validation(dataset, subsets_disponibles)
+
     model.config.pad_token_id = processor.tokenizer.pad_token_id
     model.config.decoder_start_token_id = processor.tokenizer.convert_tokens_to_ids(
         ["<s_cord-v2>"]
@@ -484,18 +511,21 @@ if __name__ == "__main__":
     # Dataloaders
     train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=4)
     
-    percentage = 0.1
-    num_samples = int(len(val_dataset) * percentage)
-    indices = torch.randperm(len(val_dataset))[:num_samples].tolist()
-    sampler = SubsetRandomSampler(indices)
-    val_dataloader = DataLoader(val_dataset, batch_size=1, sampler=sampler, num_workers=4)
+    if test_real:
+        val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=True, num_workers=4)
+    else:
+        percentage = 0.1
+        num_samples = int(len(val_dataset) * percentage)
+        indices = torch.randperm(len(val_dataset))[:num_samples].tolist()
+        sampler = SubsetRandomSampler(indices)
+        val_dataloader = DataLoader(val_dataset, batch_size=1, sampler=sampler, num_workers=4)
 
 
 
     # Train
     config = {
-        "max_steps": 20000,
-        "val_check_interval": 0.5,
+        "max_steps": 30000,
+        "val_check_interval": 0.05,
         "check_val_every_n_epoch": 1,
         "gradient_clip_val": 1.0,
         "num_training_samples_per_epoch": 800,
