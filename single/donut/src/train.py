@@ -10,6 +10,7 @@ from huggingface_hub import login, HfApi
 import pytorch_lightning as pl
 import numpy as np
 from datasets import load_dataset
+from datasets import Image as Image_d
 from transformers import (
     VisionEncoderDecoderConfig,
     DonutProcessor,
@@ -106,19 +107,19 @@ class DonutModelPLModule(pl.LightningModule):
 
 class DonutDataset(Dataset):
     """
-    PyTorch Dataset for Donut. This class takes a HuggingFace Dataset as input.
-
-    Each row, consists of image path(png/jpg/jpeg) and gt data (json/jsonl/txt),
-    and it will be converted into pixel_values (vectorized image) and labels (input_ids of the tokenized string).
+    PyTorch Dataset for Donut. Loads a HuggingFace Dataset and optionally filters
+    samples based on their image filename.
 
     Args:
-        dataset_name_or_path: name of dataset (available at huggingface.co/datasets) or the path containing image files and metadata.jsonl
-        max_length: the max number of tokens for the target sequences
-        split: whether to load "train", "validation" or "test" split
-        ignore_id: ignore_index for torch.nn.CrossEntropyLoss
-        task_start_token: the special token to be fed to the decoder to conduct the target task
-        prompt_end_token: the special token at the end of the sequences
-        sort_json_key: whether or not to sort the JSON keys
+        dataset_name_or_path (str): Name of the dataset on Hugging Face or local path.
+        subset (str): Subset or configuration name of the dataset.
+        max_length (int): Maximum number of tokens for target sequences.
+        split (str): Split to load ("train", "validation", or "test").
+        ignore_id (int): Ignore index value for loss computation.
+        task_start_token (str): Special start token for the decoder.
+        prompt_end_token (str): Special end token for the decoder.
+        sort_json_key (bool): Whether to sort JSON keys in output.
+        filter_substring (str, optional): Substring that the image filename must contain.
     """
 
     def __init__(
@@ -131,6 +132,7 @@ class DonutDataset(Dataset):
         task_start_token: str = "<s>",
         prompt_end_token: str = None,
         sort_json_key: bool = True,
+        filter_substring: str = None,
     ):
         super().__init__()
 
@@ -140,10 +142,53 @@ class DonutDataset(Dataset):
         self.task_start_token = task_start_token
         self.prompt_end_token = prompt_end_token if prompt_end_token else task_start_token
         self.sort_json_key = sort_json_key
+        self.filter_substring = filter_substring
 
-        self.dataset = load_dataset(dataset_name_or_path, name=subset, split=self.split, num_proc=8)
+        # Load the dataset
+        self.dataset = load_dataset(
+            dataset_name_or_path,
+            name=subset,
+            split=self.split,
+            num_proc=8
+        )
+
+        # Apply filename filter if provided
+        if self.filter_substring:
+            # Detect image column dynamically
+            image_column = next(
+                col for col, feat in self.dataset.features.items()
+                if isinstance(feat, Image_d)
+            )
+            # Cast to dict form to access 'path'
+            self.dataset = self.dataset.cast_column(
+                image_column,
+                Image_d(decode=False)
+            )
+
+            # Filter by substring in the file path
+            self.dataset = self.dataset.filter(
+                lambda ex: self.filter_substring in ex[image_column]["path"]
+            )
+
+            # Show first 10 paths for verification
+            sample_records = self.dataset.select(range(min(10, len(self.dataset))))
+            filenames = [rec[image_column]["path"] for rec in sample_records]
+            print("First 10 filenames:", filenames)
+
+            # Re-cast back to decoded images for __getitem__
+            self.dataset = self.dataset.cast_column(
+                image_column,
+                Image_d(decode=True)
+            )
+
+        # Calculate and log total samples after filtering
         self.dataset_length = len(self.dataset)
+        if self.filter_substring:
+            print(f"Loaded {self.dataset_length} samples after applying filter '{self.filter_substring}'.")
+        else:
+            print(f"Loaded {self.dataset_length} samples.")
 
+        # Prepare target token sequences
         self.gt_token_sequences = []
         self.added_tokens = []
         for sample in self.dataset:
@@ -152,29 +197,27 @@ class DonutDataset(Dataset):
             except json.decoder.JSONDecodeError:
                 ground_truth = ast.literal_eval(sample["ground_truth"])
 
+            # Normalize ground truth to a list of JSON objects
             if "gt_parses" in ground_truth:
-                assert isinstance(ground_truth["gt_parses"], list)
                 gt_jsons = ground_truth["gt_parses"]
             elif "gt_parse" in ground_truth and isinstance(ground_truth["gt_parse"], dict):
                 gt_jsons = [ground_truth["gt_parse"]]
             elif isinstance(ground_truth, dict):
-                # Si el diccionario no está envuelto en una clave, lo usamos directamente
                 gt_jsons = [ground_truth]
             else:
-                raise ValueError("El formato de ground_truth no es el esperado.")
+                raise ValueError("Unexpected ground_truth format.")
 
-            self.gt_token_sequences.append(
-                [
-                    self.json2token(
-                        gt_json,
-                        update_special_tokens_for_json_key=self.split == "train",
-                        sort_json_key=self.sort_json_key,
-                    )
-                    + processor.tokenizer.eos_token
-                    for gt_json in gt_jsons
-                ]
-            )
+            # Convert each JSON to token sequence
+            self.gt_token_sequences.append([
+                self.json2token(
+                    gt_json,
+                    update_special_tokens_for_json_key=(self.split == "train"),
+                    sort_json_key=self.sort_json_key,
+                ) + processor.tokenizer.eos_token
+                for gt_json in gt_jsons
+            ])
 
+        # Add special tokens to tokenizer
         self.add_tokens([self.task_start_token, self.prompt_end_token])
         self.prompt_end_token_id = processor.tokenizer.convert_tokens_to_ids(self.prompt_end_token)
 
@@ -346,7 +389,7 @@ class PushToHubCallback(Callback):
             )
 
 
-def load_session_datasets(dataset_name: str, subset: str = ""):
+def load_session_datasets(dataset_name: str, subset: str = "", school_name_subset: str = None):
 
     train_dataset = DonutDataset(
         dataset_name,
@@ -356,6 +399,7 @@ def load_session_datasets(dataset_name: str, subset: str = ""):
         task_start_token="<s_cord-v2>",
         prompt_end_token="<s_cord-v2>",
         sort_json_key=False,
+        filter_substring=school_name_subset
     )
 
     val_dataset = DonutDataset(
@@ -366,6 +410,7 @@ def load_session_datasets(dataset_name: str, subset: str = ""):
         task_start_token="<s_cord-v2>",
         prompt_end_token="<s_cord-v2>",
         sort_json_key=False,
+        filter_substring=school_name_subset
     )
 
     return train_dataset, val_dataset
@@ -433,6 +478,7 @@ if __name__ == "__main__":
     parser.add_argument("--debug", type=str)
     parser.add_argument("--dataset_name", type=str)
     parser.add_argument("--dataset_subsets", type=str, action='append')
+    parser.add_argument("--school_name_subset", type=str, default=None)
     parser.add_argument("--test_real", action="store_true", default=False)
     args = parser.parse_args()
 
@@ -445,6 +491,7 @@ if __name__ == "__main__":
     # Define constants
     dataset = args.dataset_name
     dataset_subsets = args.dataset_subsets
+    school_name_subset = args.school_name_subset
     test_real = args.test_real
     model_output_name = "".join(["donut-", dataset.split('/')[-1]])
 
@@ -486,7 +533,7 @@ if __name__ == "__main__":
         val_dataset = []
 
         for subset in dataset_subsets:
-            train_ds, val_ds = load_session_datasets(dataset_name=dataset, subset=subset)
+            train_ds, val_ds = load_session_datasets(dataset_name=dataset, subset=subset, school_name_subset=school_name_subset)
             train_dataset.append(train_ds)
             val_dataset.append(val_ds)
 
@@ -515,7 +562,7 @@ if __name__ == "__main__":
 
     # Train
     config = {
-        "max_steps": 30000,
+        "max_steps": 2500,
         "val_check_interval": 0.05,
         "check_val_every_n_epoch": 1,
         "gradient_clip_val": 1.0,
@@ -532,7 +579,12 @@ if __name__ == "__main__":
     model_module = DonutModelPLModule(config, processor, model)
 
     wandb.login(key=os.getenv("WANDB_API_KEY"))
-    wandb_logger = WandbLogger(project="Donut", name="_".join(dataset_subsets))
+    
+    session_name = "_".join(dataset_subsets)
+    if school_name_subset:
+        session_name = "_".join(dataset_subsets) + "_filtered_" + school_name_subset
+    
+    wandb_logger = WandbLogger(project="Donut", name=session_name)
 
     early_stop_callback = EarlyStopping(monitor="val_edit_distance", patience=4, verbose=False, mode="min")
 
@@ -547,7 +599,7 @@ if __name__ == "__main__":
         precision=16,
         num_sanity_val_steps=0,
         logger=wandb_logger,
-        callbacks=[PushToHubCallback("donut-merit", "_".join(dataset_subsets))],
+        callbacks=[PushToHubCallback("donut-merit", session_name)],
     )
 
     trainer.fit(model_module)
