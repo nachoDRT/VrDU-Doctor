@@ -579,6 +579,8 @@ if __name__ == "__main__":
             ("de-Rodrigo/merit-aux", "sanpablo-asc-synth", "train"),
             ("de-Rodrigo/merit-aux", "sanpatricio-asc-synth", "train")
         ]
+    else:
+        subsets_to_process = [(dataset_name, subset_name, split)]
 
     for dataset_name, subset_name, split in subsets_to_process:
 
