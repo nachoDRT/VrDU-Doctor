@@ -69,12 +69,15 @@ def get_samples_materials():
     return materials
 
 
-def load_data(data_name: str = None):
+def load_data(data_name: str = None, pca_school: str = None):
 
     data = {}
 
     if data_name == "position":
-        path = bpy.path.abspath("//plots/df_all_pca_donut.xlsx")
+        if pca_school:
+            path = bpy.path.abspath(f"//plots/df_all_pca_{pca_school}_donut.xlsx")
+        else:
+            path = bpy.path.abspath("//plots/df_all_pca_donut.xlsx")
         sheets = SHEETS
     elif data_name == "distance":
         path = bpy.path.abspath("//plots/df_real_to_synth_distance_pca_donut.xlsx")
@@ -96,44 +99,60 @@ def load_data(data_name: str = None):
     return data
 
 
-def scatter_plot(collection_name: str, df: pd.DataFrame, mat, keyframes: bool = False, r: float = 0.015):
+def scatter_plot(
+    collection_name: str,
+    df: pd.DataFrame,
+    mat,
+    keyframes: bool = False,
+    r: float = 0.015,
+    filter: str = None,
+):
+
     scatter_coll = bpy.data.collections.get(collection_name)
     if scatter_coll is None:
         scatter_coll = bpy.data.collections.new(collection_name)
         bpy.context.scene.collection.children.link(scatter_coll)
 
     for index, row in df.iterrows():
-        x = row["PC1"] * FACTOR
-        y = row["PC2"] * FACTOR
-        z = row["PC3"] * FACTOR
 
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=r, location=(x, y, z))
-        sphere = bpy.context.active_object
+        if filter in row["name"].split("_"):
+            x = row["PC1"] * FACTOR
+            y = row["PC2"] * FACTOR
+            z = row["PC3"] * FACTOR
 
-        if collection_name == "real_samples":
-            sphere.name = row["name"]
-        else:
-            sphere.name = get_blender_name(row["name"])
+            bpy.ops.mesh.primitive_uv_sphere_add(radius=r, location=(x, y, z))
+            sphere = bpy.context.active_object
 
-        if sphere.data.materials:
-            sphere.data.materials[0] = mat
-        else:
-            sphere.data.materials.append(mat)
+            if collection_name == "real_samples":
+                sphere.name = row["name"]
+            else:
+                sphere.name = get_blender_name(row["name"])
 
-        if keyframes:
-            sphere.keyframe_insert(data_path="location", frame=0)
+            if sphere.data.materials:
+                sphere.data.materials[0] = mat
+            else:
+                sphere.data.materials.append(mat)
 
-        scatter_coll.objects.link(sphere)
-        if sphere.name in bpy.context.scene.collection.objects:
-            bpy.context.scene.collection.objects.unlink(sphere)
+            if keyframes:
+                sphere.keyframe_insert(data_path="location", frame=0)
+
+            scatter_coll.objects.link(sphere)
+            if sphere.name in bpy.context.scene.collection.objects:
+                bpy.context.scene.collection.objects.unlink(sphere)
 
 
 def real_samples_scatter_plot(df, mat):
     scatter_plot("real_samples", df, mat)
 
 
-def synth_samples_scatter_plot(df, mat, collection_name_detail: str = ""):
-    scatter_plot(f"synthetic_samples_{collection_name_detail}", df, mat, keyframes=True, r=0.01)
+def synth_samples_scatter_plot(df, mat, collection_name_detail: str = "", granularity: list = None):
+
+    if granularity:
+        for group in granularity:
+            collection_name = f"synthetic_samples_{collection_name_detail}_{group}"
+            scatter_plot(collection_name, df, mat, keyframes=True, r=0.01, filter=group)
+    else:
+        scatter_plot(f"synthetic_samples_{collection_name_detail}", df, mat, keyframes=True, r=0.01)
 
 
 def get_blender_name(excel_name: str) -> str:
@@ -431,17 +450,22 @@ def show_real_samples_by_proximity(sheet: str, include_synth: bool = False):
     add_texture_to_planes()
 
 
-def show_real_samples_by_f1(synth_version: str, include_synth: bool = False):
+def show_real_samples_by_f1(synth_version: str, include_synth: bool = False, pca_school: str = None):
     """
     Create a static 3D plot where those real with better f1 score
     are green (while the opposite are red).
     """
 
-    data_pos = load_data("position")
+    data_pos = load_data("position", pca_school)
     data_f1 = load_data("f1")
 
+    if pca_school:
+        collection_name = f"real_samples_f1_gradient_{synth_version}_{pca_school}"
+    else:
+        collection_name = f"real_samples_f1_gradient_{synth_version}"
+
     real_samples_as_gradient(
-        collection_name=f"real_samples_f1_gradient_{synth_version}",
+        collection_name=collection_name,
         data_to_plot=data_pos["real"],
         colored_by=data_f1["f1"],
         grad_key=synth_version,
@@ -874,19 +898,44 @@ if __name__ == "__main__":
 
     # animate_synthetic_transformations()
 
+    """Plot real samples by feature"""
     # show_real_samples_by_proximity("es-render-seq", include_synth=True)
     # show_real_samples_by_f1("es-digital-seq", include_synth=False)
-
     # TODO
     # show_real_samples_by_feature()
 
+    """Plot real samples by f1 on different models"""
+    model_subsets = ["deus", "liceo", "lusitano", "monterraso", "patria"]
+
+    """
+    'pca_centered' options:
+        "britanico",
+        "fomento",
+        "maravillas",
+        "mater",
+        "montealto",
+        "pilar",
+        "recuerdo",
+        "retamar",
+        "sanpablo",
+        "sanpatricio",
+    """
+
+    pca_centered = "britanico"
+    for model_subset in tqdm(model_subsets):
+        model = f"es-digital-seq_filtered_{model_subset}"
+        # for real_school in real_schools:
+        # show_real_samples_by_f1(model, include_synth=False, pca_school=pca_centered)
+        show_real_samples_by_f1(model, include_synth=False)
+
     # show_planes()
 
-    """Plot a specific synth subset"""
+    # """Plot a specific synth subset"""
     # materials = get_samples_materials()
-    # data = load_data("position")
-    # subset = "es-render-seq"
-    # synth_samples_scatter_plot(data[subset], materials[1], collection_name_detail=subset)
+    # data = load_data("position", pca_school="britanico")
+    # subset = "es-digital-seq"
+
+    # synth_samples_scatter_plot(data[subset], materials[1], collection_name_detail=subset, granularity=model_subsets)
 
     """ Get the features from the position of the target object """
     # new_samples_target_features("new_samples_target")
@@ -896,4 +945,4 @@ if __name__ == "__main__":
     # print(f"Num of planes trespassed: {num_planes}")
 
     # """ Get wormhole maps"""
-    get_wormholes()
+    # get_wormholes()
