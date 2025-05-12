@@ -333,69 +333,92 @@ class DonutDataset(Dataset):
 
 
 class PushToHubCallback(Callback):
-    def __init__(self, model_output_name, dataset_subset, save_dir="checkpoints"):
+    """
+    Callback to push the model to the Hugging Face Hub only when
+    the monitored validation metric improves.
+    """
+    def __init__(
+        self,
+        model_output_name: str,
+        dataset_subset: str,
+        monitor: str = "val_edit_distance",
+        mode: str = "min",
+        save_dir: str = "checkpoints",
+    ):
+        super().__init__()
         self.api = HfApi()
         self.model_output_name = model_output_name
         self.dataset_subset = dataset_subset
         self.save_dir = save_dir
+        self.monitor = monitor
 
-    def on_train_epoch_end(self, trainer, pl_module):
-        """Sube el modelo al final de cada epoch."""
-        print(f"Pushing model to the hub, epoch {trainer.current_epoch}")
+        if mode not in {"min", "max"}:
+            raise ValueError("mode must be 'min' or 'max'")
+        self.mode = mode
+        # Initialize best_score according to mode
+        self.best_score = float('inf') if mode == "min" else -float('inf')
 
-        # Save model locally
-        epoch_subfolder = os.path.join(
-            self.save_dir, f"{self.model_output_name}_{self.dataset_subset}_epoch{trainer.current_epoch}"
+    def on_validation_epoch_end(self, trainer, pl_module):
+        """
+        Called at the end of each validation epoch. If the monitored metric improves,
+        save and push the model.
+        """
+        logs = trainer.callback_metrics
+        current_score = logs.get(self.monitor)
+        if current_score is None:
+            return
+
+        has_improved = (
+            current_score < self.best_score if self.mode == "min" else current_score > self.best_score
         )
-        pl_module.model.save_pretrained(epoch_subfolder)
-        pl_module.processor.save_pretrained(epoch_subfolder)
-
-        # Upload model to the hub
-        repo_id = f"de-Rodrigo/{self.model_output_name}"
-        self.api.upload_folder(
-            folder_path=epoch_subfolder,
-            path_in_repo=self.dataset_subset,
-            repo_id=repo_id,
-            repo_type="model",
-            commit_message=f"Training in progress, epoch {trainer.current_epoch}",
-        )
-
-        # Upload extra files
-        self._upload_card_files(repo_id)
+        if has_improved:
+            print(f"Detected improvement in {self.monitor}: {self.best_score} -> {current_score}")
+            self.best_score = current_score
+            self._push_model(trainer, pl_module, epoch=trainer.current_epoch)
 
     def on_train_end(self, trainer, pl_module):
-        """Sube la versión final del modelo después del entrenamiento."""
-        print(f"Pushing model to the hub after training")
+        """
+        Called once training is complete. Only push the card files (README, configs, etc.)
+        to the Hub.
+        """
+        print("Uploading final card files to the Hub...")
+        repo_id = f"de-Rodrigo/{self.model_output_name}"
+        self._upload_card_files(repo_id)
 
-        # Save model locally
-        final_model_dir = os.path.join(self.save_dir, f"{self.model_output_name}_final")
-        pl_module.model.save_pretrained(final_model_dir)
-        pl_module.processor.save_pretrained(final_model_dir)
+    def _push_model(self, trainer, pl_module, epoch: int):
+        """
+        Save the model and processor locally and push them to the Hub.
+        """
+        save_path = os.path.join(
+            self.save_dir,
+            f"{self.model_output_name}_{self.dataset_subset}_epoch{epoch}",
+        )
+        pl_module.model.save_pretrained(save_path)
+        pl_module.processor.save_pretrained(save_path)
 
         repo_id = f"de-Rodrigo/{self.model_output_name}"
-
-        # Upload model to the hub
         self.api.upload_folder(
-            folder_path=final_model_dir,
+            folder_path=save_path,
             path_in_repo=self.dataset_subset,
             repo_id=repo_id,
             repo_type="model",
-            commit_message="Training done, final model uploaded",
+            commit_message=f"Best model up to epoch {epoch} ({self.monitor}={self.best_score})",
         )
-
-        # Upload extra files
+        # Upload additional files as well
         self._upload_card_files(repo_id)
 
-    def _upload_card_files(self, repo_id):
-        """Sube archivos adicionales como README, config.json, etc."""
-        for file in HF_CARD_FILES:
-            print(f"Uploading {file} to {repo_id}")
+    def _upload_card_files(self, repo_id: str):
+        """
+        Upload additional card files (README, configs, etc.) to the repository.
+        """
+        for file_path in HF_CARD_FILES:
+            print(f"Uploading {file_path} to {repo_id}")
             self.api.upload_file(
-                path_or_fileobj=file,
-                path_in_repo="/".join(file.split("/")[4:]),
+                path_or_fileobj=file_path,
+                path_in_repo="/".join(file_path.split(os.sep)[4:]),
                 repo_id=repo_id,
                 repo_type="model",
-                commit_message="Uploading additional files",
+                commit_message="Uploading card files",
             )
 
 
@@ -583,7 +606,7 @@ if __name__ == "__main__":
 
     # Train
     config = {
-        "max_steps": 2500,
+        "max_steps": 7500,
         "val_check_interval": 0.05,
         "check_val_every_n_epoch": 1,
         "gradient_clip_val": 1.0,
@@ -608,7 +631,7 @@ if __name__ == "__main__":
     
     wandb_logger = WandbLogger(project="Donut", name=session_name)
 
-    early_stop_callback = EarlyStopping(monitor="val_edit_distance", patience=4, verbose=False, mode="min")
+    early_stop_callback = EarlyStopping(monitor="val_edit_distance", patience=10, verbose=False, mode="min")
 
     trainer = pl.Trainer(
         accelerator="gpu",
@@ -621,7 +644,7 @@ if __name__ == "__main__":
         precision=16,
         num_sanity_val_steps=0,
         logger=wandb_logger,
-        callbacks=[PushToHubCallback("donut-merit", session_name)],
+        callbacks=[early_stop_callback, PushToHubCallback("donut-merit", session_name)],
     )
 
     trainer.fit(model_module)
