@@ -33,11 +33,16 @@ HF_CARD_FILES = [
 
 
 class DonutModelPLModule(pl.LightningModule):
-    def __init__(self, config, processor, model):
+    def __init__(self, config, processor, model, freeze_encoder):
         super().__init__()
         self.config = config
         self.processor = processor
         self.model = model
+
+        if freeze_encoder:
+            for param in self.model.encoder.parameters():
+                param.requires_grad = False
+            self.model.encoder.eval()
 
     def training_step(self, batch, batch_idx):
         pixel_values, labels, _ = batch
@@ -93,10 +98,15 @@ class DonutModelPLModule(pl.LightningModule):
 
         return scores
 
-    def configure_optimizers(self):
-        # you could also add a learning rate scheduler if you want
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.config.get("lr"))
+    # def configure_optimizers(self):
+    #     # you could also add a learning rate scheduler if you want
+    #     optimizer = torch.optim.Adam(self.parameters(), lr=self.config.get("lr"))
 
+    #     return optimizer
+
+    def configure_optimizers(self):
+        trainable_params = filter(lambda p: p.requires_grad, self.parameters())
+        optimizer = torch.optim.Adam(trainable_params, lr=self.config.get("lr"))
         return optimizer
 
     def train_dataloader(self):
@@ -524,6 +534,7 @@ if __name__ == "__main__":
     parser.add_argument("--dataset_subsets", type=str, action='append')
     parser.add_argument("--school_name_subsets", type=str, action='append', default=None)
     parser.add_argument("--test_real", action="store_true", default=False)
+    parser.add_argument("--freeze_encoder", action="store_true", default=False)
     args = parser.parse_args()
 
     # Debug
@@ -533,6 +544,7 @@ if __name__ == "__main__":
         debugpy.wait_for_client()
 
     # Define constants
+    freeze_encoder = args.freeze_encoder
     dataset = args.dataset_name
     dataset_subsets = args.dataset_subsets
     school_name_subsets = args.school_name_subsets
@@ -605,9 +617,11 @@ if __name__ == "__main__":
         val_dataloader = DataLoader(val_dataset, batch_size=1, sampler=sampler, num_workers=4)
 
     # Train
+    val_check_period = 0.05
+
     config = {
-        "max_steps": 7500,
-        "val_check_interval": 0.05,
+        "max_steps": 100000,
+        "val_check_interval": val_check_period,
         "check_val_every_n_epoch": 1,
         "gradient_clip_val": 1.0,
         "num_training_samples_per_epoch": 800,
@@ -620,7 +634,7 @@ if __name__ == "__main__":
         "verbose": True,
     }
 
-    model_module = DonutModelPLModule(config, processor, model)
+    model_module = DonutModelPLModule(config, processor, model, freeze_encoder)
 
     wandb.login(key=os.getenv("WANDB_API_KEY"))
     
@@ -629,9 +643,13 @@ if __name__ == "__main__":
         shool_combination_name = get_school_combination_name(school_name_subsets)
         session_name = "_".join(dataset_subsets) + "_filtered_" + shool_combination_name
     
+    if freeze_encoder:
+        session_name += "-frozen-encoder"
+
+
     wandb_logger = WandbLogger(project="Donut", name=session_name)
 
-    early_stop_callback = EarlyStopping(monitor="val_edit_distance", patience=10, verbose=False, mode="min")
+    early_stop_callback = EarlyStopping(monitor="val_edit_distance", patience=int(1/val_check_period)*5, verbose=False, mode="min")
 
     trainer = pl.Trainer(
         accelerator="gpu",

@@ -40,7 +40,7 @@ def delete_hf_cache_memory():
         raise Warning("HuggingFace cache was not found")
 
 
-def manage_training_session(combs: list, n: int):
+def manage_training_session(combs: list, n: int, freeze_encoder):
     
     for i, combination in enumerate(combs):
 
@@ -52,6 +52,8 @@ def manage_training_session(combs: list, n: int):
         prompt = ["python", "src/train.py", "--debug",  "False", "--dataset_name", "de-Rodrigo/merit", "--dataset_subset", "es-digital-seq"]
         prompt.extend(prompt_datasets)
         prompt.extend(["--test_real"])
+        if freeze_encoder:
+            prompt.extend(["--freeze_encoder"])
         subprocess.run(prompt)
 
         # Delete cache memory
@@ -63,13 +65,15 @@ if __name__ == "__main__":
     # Define parsing values
     parser = argparse.ArgumentParser()
     parser.add_argument("--combinations_length", type=int)
+    parser.add_argument("--freeze_encoder", action="store_true", default=False)
     args = parser.parse_args()
 
     # Get parsed values
     n = args.combinations_length
+    freeze_encoder = args.freeze_encoder
 
     # Get combinations
     combinations = get_subsets_combinations(SUBSETS, n)
     print(len(combinations))
 
-    manage_training_session(combinations, n)
+    manage_training_session(combinations, n, freeze_encoder)
