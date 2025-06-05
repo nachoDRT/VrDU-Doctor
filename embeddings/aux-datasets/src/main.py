@@ -136,14 +136,35 @@ def get_aux_synth_dataset(dataset_name: str):
     return {"image": images_bytes, "ground_truth": ground_truths}
 
 
+def filter_dataset():
+    root_path = dirname(dirname(abspath(__file__)))
+    base_path = join(root_path, "data", dataset_name, "dataset_output")
+
+    imgs_path = join(base_path, "images")
+    annotations_path = join(base_path, "annotations")
+
+    for img_name in os.listdir(imgs_path):
+        file_name = img_name.split(".")[0]
+        sufix = img_name.split("_")[-1]
+        tag = sufix.split(".")[0]
+
+        if tag == str(1):
+            img_path = join(imgs_path, img_name)
+            annotation_path = join(annotations_path, "".join([file_name, ".json"]))
+            os.remove(img_path)
+            os.remove(annotation_path)
+
+
 if __name__ == "__main__":
 
     # Parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", type=str)
+    parser.add_argument("--filter_data", action="store_true")
     args = parser.parse_args()
 
     dataset_name = args.dataset
+    filter_data = args.filter_data
 
     dataset = []
 
@@ -154,11 +175,15 @@ if __name__ == "__main__":
         subset = get_subset_from_hub(dataset_name)
 
     elif "-".join(dataset_name.split("-")[1:]) == "asc-synth":
-        subset = get_aux_synth_dataset(dataset_name)
+
+        if filter_data:
+            filter_dataset()
+
+        # subset = get_aux_synth_dataset(dataset_name)
 
     else:
         print(f"{dataset_name} implementation is not available")
 
-    dataset.append(("train", subset))
-    dataset = format_data(dict(dataset))
-    push_dataset_to_hf(dataset, dataset_name, "merit-aux")
+    # dataset.append(("train", subset))
+    # dataset = format_data(dict(dataset))
+    # push_dataset_to_hf(dataset, dataset_name, "merit-aux")
