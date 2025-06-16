@@ -23,6 +23,7 @@ from pytorch_lightning.callbacks import EarlyStopping, Callback
 from pytorch_lightning.loggers import WandbLogger
 from PIL import Image
 import ast
+from typing import Union
 
 HF_CARD_FILES = [
     "/app/src/card/README.md",
@@ -32,11 +33,16 @@ HF_CARD_FILES = [
 
 
 class DonutModelPLModule(pl.LightningModule):
-    def __init__(self, config, processor, model):
+    def __init__(self, config, processor, model, freeze_encoder):
         super().__init__()
         self.config = config
         self.processor = processor
         self.model = model
+
+        if freeze_encoder:
+            for param in self.model.encoder.parameters():
+                param.requires_grad = False
+            self.model.encoder.eval()
 
     def training_step(self, batch, batch_idx):
         pixel_values, labels, _ = batch
@@ -92,10 +98,15 @@ class DonutModelPLModule(pl.LightningModule):
 
         return scores
 
-    def configure_optimizers(self):
-        # you could also add a learning rate scheduler if you want
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.config.get("lr"))
+    # def configure_optimizers(self):
+    #     # you could also add a learning rate scheduler if you want
+    #     optimizer = torch.optim.Adam(self.parameters(), lr=self.config.get("lr"))
 
+    #     return optimizer
+
+    def configure_optimizers(self):
+        trainable_params = filter(lambda p: p.requires_grad, self.parameters())
+        optimizer = torch.optim.Adam(trainable_params, lr=self.config.get("lr"))
         return optimizer
 
     def train_dataloader(self):
@@ -119,7 +130,8 @@ class DonutDataset(Dataset):
         task_start_token (str): Special start token for the decoder.
         prompt_end_token (str): Special end token for the decoder.
         sort_json_key (bool): Whether to sort JSON keys in output.
-        filter_substring (str, optional): Substring that the image filename must contain.
+        filter_substring (str or List[str], optional): Substring o lista de substrings
+            que el nombre de la imagen debe contener.
     """
 
     def __init__(
@@ -132,7 +144,7 @@ class DonutDataset(Dataset):
         task_start_token: str = "<s>",
         prompt_end_token: str = None,
         sort_json_key: bool = True,
-        filter_substring: str = None,
+        filter_substring: Union[str, List[str]] = None,  # <-- aquí
     ):
         super().__init__()
 
@@ -142,7 +154,16 @@ class DonutDataset(Dataset):
         self.task_start_token = task_start_token
         self.prompt_end_token = prompt_end_token if prompt_end_token else task_start_token
         self.sort_json_key = sort_json_key
-        self.filter_substring = filter_substring
+
+
+        # Normaliza a lista de substrings
+        if filter_substring:
+            if isinstance(filter_substring, str):
+                self.filter_substring = [filter_substring]
+            else:
+                self.filter_substring = filter_substring
+        else:
+            self.filter_substring = None
 
         # Load the dataset
         self.dataset = load_dataset(
@@ -154,37 +175,36 @@ class DonutDataset(Dataset):
 
         # Apply filename filter if provided
         if self.filter_substring:
-            # Detect image column dynamically
             image_column = next(
                 col for col, feat in self.dataset.features.items()
                 if isinstance(feat, Image_d)
             )
-            # Cast to dict form to access 'path'
             self.dataset = self.dataset.cast_column(
                 image_column,
                 Image_d(decode=False)
             )
 
-            # Filter by substring in the file path
+            # Filtra si **cualquiera** de los substrings está en el path
+            substrs = self.filter_substring  # lista de strings
             self.dataset = self.dataset.filter(
-                lambda ex: self.filter_substring in ex[image_column]["path"]
+                lambda ex: any(sub in ex[image_column]["path"] for sub in substrs)
             )
 
-            # Show first 10 paths for verification
+            # Mostrar ejemplos para verificar
             sample_records = self.dataset.select(range(min(10, len(self.dataset))))
             filenames = [rec[image_column]["path"] for rec in sample_records]
-            print("First 10 filenames:", filenames)
+            print("First 10 filenames matching any of", substrs, ":", filenames)
 
-            # Re-cast back to decoded images for __getitem__
+            # Re-cast back to decoded images para __getitem__
             self.dataset = self.dataset.cast_column(
                 image_column,
                 Image_d(decode=True)
             )
 
-        # Calculate and log total samples after filtering
+        # Calcular longitud tras el filtro
         self.dataset_length = len(self.dataset)
         if self.filter_substring:
-            print(f"Loaded {self.dataset_length} samples after applying filter '{self.filter_substring}'.")
+            print(f"Loaded {self.dataset_length} samples after applying filter {self.filter_substring!r}.")
         else:
             print(f"Loaded {self.dataset_length} samples.")
 
@@ -323,73 +343,96 @@ class DonutDataset(Dataset):
 
 
 class PushToHubCallback(Callback):
-    def __init__(self, model_output_name, dataset_subset, save_dir="checkpoints"):
+    """
+    Callback to push the model to the Hugging Face Hub only when
+    the monitored validation metric improves.
+    """
+    def __init__(
+        self,
+        model_output_name: str,
+        dataset_subset: str,
+        monitor: str = "val_edit_distance",
+        mode: str = "min",
+        save_dir: str = "checkpoints",
+    ):
+        super().__init__()
         self.api = HfApi()
         self.model_output_name = model_output_name
         self.dataset_subset = dataset_subset
         self.save_dir = save_dir
+        self.monitor = monitor
 
-    def on_train_epoch_end(self, trainer, pl_module):
-        """Sube el modelo al final de cada epoch."""
-        print(f"Pushing model to the hub, epoch {trainer.current_epoch}")
+        if mode not in {"min", "max"}:
+            raise ValueError("mode must be 'min' or 'max'")
+        self.mode = mode
+        # Initialize best_score according to mode
+        self.best_score = float('inf') if mode == "min" else -float('inf')
 
-        # Save model locally
-        epoch_subfolder = os.path.join(
-            self.save_dir, f"{self.model_output_name}_{self.dataset_subset}_epoch{trainer.current_epoch}"
+    def on_validation_epoch_end(self, trainer, pl_module):
+        """
+        Called at the end of each validation epoch. If the monitored metric improves,
+        save and push the model.
+        """
+        logs = trainer.callback_metrics
+        current_score = logs.get(self.monitor)
+        if current_score is None:
+            return
+
+        has_improved = (
+            current_score < self.best_score if self.mode == "min" else current_score > self.best_score
         )
-        pl_module.model.save_pretrained(epoch_subfolder)
-        pl_module.processor.save_pretrained(epoch_subfolder)
-
-        # Upload model to the hub
-        repo_id = f"de-Rodrigo/{self.model_output_name}"
-        self.api.upload_folder(
-            folder_path=epoch_subfolder,
-            path_in_repo=self.dataset_subset,
-            repo_id=repo_id,
-            repo_type="model",
-            commit_message=f"Training in progress, epoch {trainer.current_epoch}",
-        )
-
-        # Upload extra files
-        self._upload_card_files(repo_id)
+        if has_improved:
+            print(f"Detected improvement in {self.monitor}: {self.best_score} -> {current_score}")
+            self.best_score = current_score
+            self._push_model(trainer, pl_module, epoch=trainer.current_epoch)
 
     def on_train_end(self, trainer, pl_module):
-        """Sube la versión final del modelo después del entrenamiento."""
-        print(f"Pushing model to the hub after training")
+        """
+        Called once training is complete. Only push the card files (README, configs, etc.)
+        to the Hub.
+        """
+        print("Uploading final card files to the Hub...")
+        repo_id = f"de-Rodrigo/{self.model_output_name}"
+        self._upload_card_files(repo_id)
 
-        # Save model locally
-        final_model_dir = os.path.join(self.save_dir, f"{self.model_output_name}_final")
-        pl_module.model.save_pretrained(final_model_dir)
-        pl_module.processor.save_pretrained(final_model_dir)
+    def _push_model(self, trainer, pl_module, epoch: int):
+        """
+        Save the model and processor locally and push them to the Hub.
+        """
+        save_path = os.path.join(
+            self.save_dir,
+            f"{self.model_output_name}_{self.dataset_subset}_epoch{epoch}",
+        )
+        pl_module.model.save_pretrained(save_path)
+        pl_module.processor.save_pretrained(save_path)
 
         repo_id = f"de-Rodrigo/{self.model_output_name}"
-
-        # Upload model to the hub
         self.api.upload_folder(
-            folder_path=final_model_dir,
+            folder_path=save_path,
             path_in_repo=self.dataset_subset,
             repo_id=repo_id,
             repo_type="model",
-            commit_message="Training done, final model uploaded",
+            commit_message=f"Best model up to epoch {epoch} ({self.monitor}={self.best_score})",
         )
-
-        # Upload extra files
+        # Upload additional files as well
         self._upload_card_files(repo_id)
 
-    def _upload_card_files(self, repo_id):
-        """Sube archivos adicionales como README, config.json, etc."""
-        for file in HF_CARD_FILES:
-            print(f"Uploading {file} to {repo_id}")
+    def _upload_card_files(self, repo_id: str):
+        """
+        Upload additional card files (README, configs, etc.) to the repository.
+        """
+        for file_path in HF_CARD_FILES:
+            print(f"Uploading {file_path} to {repo_id}")
             self.api.upload_file(
-                path_or_fileobj=file,
-                path_in_repo="/".join(file.split("/")[4:]),
+                path_or_fileobj=file_path,
+                path_in_repo="/".join(file_path.split(os.sep)[4:]),
                 repo_id=repo_id,
                 repo_type="model",
-                commit_message="Uploading additional files",
+                commit_message="Uploading card files",
             )
 
 
-def load_session_datasets(dataset_name: str, subset: str = "", school_name_subset: str = None):
+def load_session_datasets(dataset_name: str, subset: str = "", school_name_subsets: str = None):
 
     train_dataset = DonutDataset(
         dataset_name,
@@ -399,7 +442,7 @@ def load_session_datasets(dataset_name: str, subset: str = "", school_name_subse
         task_start_token="<s_cord-v2>",
         prompt_end_token="<s_cord-v2>",
         sort_json_key=False,
-        filter_substring=school_name_subset
+        filter_substring=school_name_subsets
     )
 
     val_dataset = DonutDataset(
@@ -410,7 +453,7 @@ def load_session_datasets(dataset_name: str, subset: str = "", school_name_subse
         task_start_token="<s_cord-v2>",
         prompt_end_token="<s_cord-v2>",
         sort_json_key=False,
-        filter_substring=school_name_subset
+        filter_substring=school_name_subsets
     )
 
     return train_dataset, val_dataset
@@ -471,6 +514,17 @@ def load_secret_dataset_as_validation(dataset_name: str, subsets: list):
     return val_dataset
 
 
+def get_school_combination_name(comb: tuple) -> str:
+    name = ""
+
+    for element in comb:
+        if name != "":
+            name += "-"
+        name += element
+
+    return name
+
+
 if __name__ == "__main__":
 
     # Define parsing values
@@ -478,8 +532,9 @@ if __name__ == "__main__":
     parser.add_argument("--debug", type=str)
     parser.add_argument("--dataset_name", type=str)
     parser.add_argument("--dataset_subsets", type=str, action='append')
-    parser.add_argument("--school_name_subset", type=str, default=None)
+    parser.add_argument("--school_name_subsets", type=str, action='append', default=None)
     parser.add_argument("--test_real", action="store_true", default=False)
+    parser.add_argument("--freeze_encoder", action="store_true", default=False)
     args = parser.parse_args()
 
     # Debug
@@ -489,9 +544,10 @@ if __name__ == "__main__":
         debugpy.wait_for_client()
 
     # Define constants
+    freeze_encoder = args.freeze_encoder
     dataset = args.dataset_name
     dataset_subsets = args.dataset_subsets
-    school_name_subset = args.school_name_subset
+    school_name_subsets = args.school_name_subsets
     test_real = args.test_real
     model_output_name = "".join(["donut-", dataset.split('/')[-1]])
 
@@ -533,7 +589,7 @@ if __name__ == "__main__":
         val_dataset = []
 
         for subset in dataset_subsets:
-            train_ds, val_ds = load_session_datasets(dataset_name=dataset, subset=subset, school_name_subset=school_name_subset)
+            train_ds, val_ds = load_session_datasets(dataset_name=dataset, subset=subset, school_name_subsets=school_name_subsets)
             train_dataset.append(train_ds)
             val_dataset.append(val_ds)
 
@@ -561,9 +617,11 @@ if __name__ == "__main__":
         val_dataloader = DataLoader(val_dataset, batch_size=1, sampler=sampler, num_workers=4)
 
     # Train
+    val_check_period = 0.05
+
     config = {
-        "max_steps": 2500,
-        "val_check_interval": 0.05,
+        "max_steps": 100000,
+        "val_check_interval": val_check_period,
         "check_val_every_n_epoch": 1,
         "gradient_clip_val": 1.0,
         "num_training_samples_per_epoch": 800,
@@ -576,17 +634,22 @@ if __name__ == "__main__":
         "verbose": True,
     }
 
-    model_module = DonutModelPLModule(config, processor, model)
+    model_module = DonutModelPLModule(config, processor, model, freeze_encoder)
 
     wandb.login(key=os.getenv("WANDB_API_KEY"))
     
     session_name = "_".join(dataset_subsets)
-    if school_name_subset:
-        session_name = "_".join(dataset_subsets) + "_filtered_" + school_name_subset
+    if school_name_subsets:
+        shool_combination_name = get_school_combination_name(school_name_subsets)
+        session_name = "_".join(dataset_subsets) + "_filtered_" + shool_combination_name
     
+    if freeze_encoder:
+        session_name += "-frozen-encoder"
+
+
     wandb_logger = WandbLogger(project="Donut", name=session_name)
 
-    early_stop_callback = EarlyStopping(monitor="val_edit_distance", patience=4, verbose=False, mode="min")
+    early_stop_callback = EarlyStopping(monitor="val_edit_distance", patience=int(1/val_check_period)*5, verbose=False, mode="min")
 
     trainer = pl.Trainer(
         accelerator="gpu",
@@ -599,7 +662,7 @@ if __name__ == "__main__":
         precision=16,
         num_sanity_val_steps=0,
         logger=wandb_logger,
-        callbacks=[PushToHubCallback("donut-merit", session_name)],
+        callbacks=[early_stop_callback, PushToHubCallback("donut-merit", session_name)],
     )
 
     trainer.fit(model_module)

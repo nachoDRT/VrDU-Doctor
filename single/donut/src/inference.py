@@ -200,7 +200,7 @@ def process_dataset(dataset_iterator):
         # if i + 1 >= SAMPLES_LIMIT:
         #     break
 
-    return np.mean(accs)
+    return accs, output_list
 
 
 def init_hf_hub():
@@ -239,5 +239,7 @@ if __name__ == "__main__":
         dataset_iter = get_dataset_iterator(dataset_name, subset_name)
 
         # Process dataset
-        mean_acc = process_dataset(dataset_iter)
-        print(f"Mean accuracy {subset_name}: {mean_acc}")
+        accs, outputs_list = process_dataset(dataset_iter)
+        print(f"Mean accuracy {subset_name}: {np.mean(accs)}")
+        # print(outputs_list)
+        print(accs)

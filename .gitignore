@@ -33,10 +33,17 @@ vanillas/idefics3/log.txt
 vanillas/data
 
 *.pyc
+*.blend1
 
 single/idefics2/log.txt
 
 embeddings/idefics2/log.txt
 embeddings/idefics2/config/secrets.json
 embeddings/sandbox/donut
+embeddings/aux-datasets/IIT-CDIP
 embeddings/aux-datasets/data/IIT-CDIP
+embeddings/sandbox/blender/results
+embeddings/sandbox/blender/wormholes
+embeddings/aux-datasets/data
+
+embeddings/aux-datasets/config/hf_config.json

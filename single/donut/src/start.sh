@@ -6,14 +6,16 @@ chmod +x src/inference.py
 
 python src/train.py \
     --debug False \
-    --dataset_name de-Rodrigo/merit-secret \
-    --dataset_subset real
+    --dataset_name de-Rodrigo/merit \
+    --dataset_subset es-digital-seq \
+    --school_name_subset "deus" \
+    --test_real
 
 # python src/inference.py \
 #     --dataset de-Rodrigo/merit-secret \
 #     --subset all \
-#     --model es-render-seq
-    # --model es-digital-paragraph-degradation-seq
-    # --model es-digital-line-degradation-seq
-    # --model es-digital-seq
-    # --model es-render-seq
+#     --model es-render-seq_es-digital-seq
+#     # --model es-digital-paragraph-degradation-seq
+#     # --model es-digital-line-degradation-seq
+#     # --model es-digital-seq
+#     # --model es-render-seq
