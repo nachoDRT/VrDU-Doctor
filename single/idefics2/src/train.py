@@ -287,6 +287,38 @@ class PushToHubCallback(Callback):
             )
 
 
+def save_and_push_model(processor, model, repo_id, dataset_subset, save_dir, commit_message):
+
+    os.makedirs(save_dir, exist_ok=True)
+    checkpoint_dir = os.path.join(save_dir, "initial_checkpoint")
+    os.makedirs(checkpoint_dir, exist_ok=True)
+    
+    # Guardar modelo y procesador
+    model.save_pretrained(checkpoint_dir)
+    processor.save_pretrained(checkpoint_dir)
+    
+    # Subir al hub
+    login(token=os.getenv("HUGGINGFACE_HUB_TOKEN"))
+    api = HfApi()
+    api.upload_folder(
+        folder_path=checkpoint_dir,
+        path_in_repo=dataset_subset,
+        repo_id=repo_id,
+        repo_type="model",
+        commit_message=commit_message
+    )
+
+    for file in HF_CARD_FILES:
+        print(f"Uploading {file} to {repo_id}")
+        api.upload_file(
+            path_or_fileobj=file,
+            path_in_repo='/'.join(file.split('/')[4:]),
+            repo_id=repo_id,
+            repo_type="model",
+            commit_message="Uploading additional files"
+        )
+
+
 def load_model() -> Idefics2ForConditionalGeneration:
     """ Three options for training, from the lowest precision training to the highest 
     precision training:
@@ -416,8 +448,8 @@ def eval_collate_fn(examples, processor, model):
 
 def init_pl_module(processor, model):
     configuration = {"max_epochs": 10,
-        "val_check_interval": 1.0,
-        "check_val_every_n_epoch": 2,
+        "val_check_interval": 0.05,
+        "check_val_every_n_epoch": 1,
         "gradient_clip_val": 1.0,
         "accumulate_grad_batches": 8,
         "lr": 1e-4,
@@ -462,6 +494,7 @@ if __name__ == "__main__":
     parser.add_argument("--debug", required=True, type=str)
     parser.add_argument("--dataset", required=True, type=str)
     parser.add_argument("--subset", default=None, type=str)
+    parser.add_argument("--save_initial", action="store_true", help="Save and upload vanilla model (PEFTed, no trained)")
     args = parser.parse_args()
 
     # Debug
@@ -483,6 +516,19 @@ if __name__ == "__main__":
     # Apply Parameter-Efficient Fine-Tuning (PEFT)
     if not USE_ADD_ADAPTER:
         idefics2 = apply_peft()
+
+    
+    if args.save_initial:
+        save_and_push_model(
+            processor=idefics2_processor,
+            model=idefics2,
+            repo_id=MODEL_REPO_ID,
+            dataset_subset="vanilla",
+            save_dir="./initial_checkpoint",
+            commit_message="Initial model upload (vanilla, encapsulated with PEFT)"
+        )
+        print("Initial model has been uploaded.")
+        exit()
 
     # Collate Function
     image_token_id = idefics2_processor.tokenizer.additional_special_tokens_ids[idefics2_processor.tokenizer.additional_special_tokens.index("<image>")]
