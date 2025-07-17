@@ -5,13 +5,23 @@ import shutil
 from pathlib import Path
 
 
+# SUBSETS = [
+#     "deus",
+#     "liceo",
+#     "lusitano",
+#     "monterraso",
+#     "patria"
+# ]
+
 SUBSETS = [
     "deus",
-    "liceo",
-    "lusitano",
     "monterraso",
     "patria"
 ]
+
+# SUBSETS = [
+#     "retamar_train"
+# ]
 
 def get_subsets_combinations(subsets: list, n: int = 2):
     combinations = list(itertools.combinations(subsets, n))
@@ -49,7 +59,8 @@ def manage_training_session(combs: list, n: int, freeze_encoder):
             prompt_datasets.append("--school_name_subset")
             prompt_datasets.append(component)
 
-        prompt = ["python", "src/train.py", "--debug",  "False", "--dataset_name", "de-Rodrigo/merit", "--dataset_subset", "es-digital-seq"]
+        # prompt = ["python", "src/train.py", "--debug",  "False", "--dataset_name", "de-Rodrigo/merit-aux", "--dataset_subset", "retamar_train-asc-synth"]
+        prompt = ["python", "src/train.py", "--debug",  "False", "--dataset_name", "combination", "--dataset_subset", "-"]
         prompt.extend(prompt_datasets)
         prompt.extend(["--test_real"])
         if freeze_encoder:
