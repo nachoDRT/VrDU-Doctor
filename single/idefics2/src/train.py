@@ -10,7 +10,7 @@ import lightning as L
 import numpy as np
 from huggingface_hub import login, HfApi
 from datasets import load_dataset
-from torch.utils.data import Dataset, DataLoader, SubsetRandomSampler
+from torch.utils.data import Dataset, DataLoader, SubsetRandomSampler, ConcatDataset
 from typing import Any, List, Dict
 from nltk import edit_distance
 from lightning.pytorch.callbacks import Callback
@@ -223,69 +223,86 @@ class Idefics2ModelPLModule(L.LightningModule):
 
 
 class PushToHubCallback(Callback):
-    def __init__(self, model_output_name, dataset_subset, save_dir="checkpoints"):
+    """
+    Callback para subir el modelo a Hugging Face Hub solamente cuando mejora la métrica de validación.
+    """
+    def __init__(
+        self,
+        model_output_name: str,
+        dataset_subset: str,
+        monitor: str = "val_edit_distance",
+        mode: str = "min",
+        save_dir: str = "checkpoints",
+    ):
+        super().__init__()
         self.api = HfApi()
         self.model_output_name = model_output_name
         self.dataset_subset = dataset_subset
         self.save_dir = save_dir
+        self.monitor = monitor
 
-    def on_train_epoch_end(self, trainer, pl_module):
-        """Sube el modelo al final de cada epoch."""
-        print(f"Pushing model to the hub, epoch {trainer.current_epoch}")
+        if mode not in {"min", "max"}:
+            raise ValueError("mode must be 'min' or 'max'")
+        self.mode = mode
+        self.best_score = float('inf') if mode == "min" else -float('inf')
 
-        # Save model locally
-        epoch_subfolder = os.path.join(self.save_dir, f"{self.model_output_name}_{self.dataset_subset}_epoch{trainer.current_epoch}")
-        pl_module.model.save_pretrained(epoch_subfolder)
-        pl_module.processor.save_pretrained(epoch_subfolder)
+    def on_validation_epoch_end(self, trainer, pl_module):
+        """
+        Subida condicional del modelo si mejora la métrica monitorizada.
+        """
+        logs = trainer.callback_metrics
+        current_score = logs.get(self.monitor)
 
-        # Upload model to the hub
+        if current_score is None:
+            return  # No hay métrica aún
+
+        improved = (
+            current_score < self.best_score if self.mode == "min"
+            else current_score > self.best_score
+        )
+
+        if improved:
+            print(f"[PushToHubCallback] {self.monitor} mejoró: {self.best_score} -> {current_score}")
+            self.best_score = current_score
+            self._push_model(trainer, pl_module)
+
+    def _push_model(self, trainer, pl_module):
+        """
+        Guarda y sube el modelo a Hugging Face Hub.
+        """
+        epoch = trainer.current_epoch
+        save_path = os.path.join(
+            self.save_dir,
+            f"{self.model_output_name}_{self.dataset_subset}_epoch{epoch}",
+        )
+
+        pl_module.model.save_pretrained(save_path)
+        pl_module.processor.save_pretrained(save_path)
+
         repo_id = f"{self.model_output_name}"
         self.api.upload_folder(
-            folder_path=epoch_subfolder,
+            folder_path=save_path,
             path_in_repo=self.dataset_subset,
             repo_id=repo_id,
             repo_type="model",
-            commit_message=f"Training in progress, epoch {trainer.current_epoch}"
+            commit_message=f"Mejor modelo hasta epoch {epoch} ({self.monitor}={self.best_score})",
         )
 
-        # Upload extra files
         self._upload_card_files(repo_id)
 
-    def on_train_end(self, trainer, pl_module):
-        """Sube la versión final del modelo después del entrenamiento."""
-        print(f"Pushing model to the hub after training")
-
-        # Save model locally
-        final_model_dir = os.path.join(self.save_dir, f"{self.model_output_name}_final")
-        pl_module.model.save_pretrained(final_model_dir)
-        pl_module.processor.save_pretrained(final_model_dir)
-
-        repo_id = f"{self.model_output_name}"
-        
-        # Upload model to the hub
-        self.api.upload_folder(
-            folder_path=final_model_dir,
-            path_in_repo=self.dataset_subset,
-            repo_id=repo_id,
-            repo_type="model",
-            commit_message="Training done, final model uploaded"
-        )
-
-        # Upload extra files
-        self._upload_card_files(repo_id)
-
-    def _upload_card_files(self, repo_id):
-        """Sube archivos adicionales como README, config.json, etc."""
-        for file in HF_CARD_FILES:
-            print(f"Uploading {file} to {repo_id}")
+    def _upload_card_files(self, repo_id: str):
+        """
+        Sube archivos adicionales como README, config, etc.
+        """
+        for file_path in HF_CARD_FILES:
+            print(f"Uploading {file_path} to {repo_id}")
             self.api.upload_file(
-                path_or_fileobj=file,
-                path_in_repo='/'.join(file.split('/')[4:]),
+                path_or_fileobj=file_path,
+                path_in_repo="/".join(file_path.split(os.sep)[4:]),
                 repo_id=repo_id,
                 repo_type="model",
-                commit_message="Uploading additional files"
+                commit_message="Uploading card files",
             )
-
 
 def save_and_push_model(processor, model, repo_id, dataset_subset, save_dir, commit_message):
 
@@ -467,7 +484,6 @@ def init_pl_module(processor, model):
 
 
 def train_idefics2(idefics2, configuration):
-    login(token=os.getenv("HUGGINGFACE_HUB_TOKEN"))
     wandb.login(key=os.getenv("WANDB_API_KEY"))
     wandb_logger = WandbLogger(project="Idefics2", name=args.subset)
 
@@ -487,6 +503,31 @@ def train_idefics2(idefics2, configuration):
     trainer.fit(idefics2)
 
 
+def load_secret_dataset():
+
+    val_datasets = []
+
+    subsets_disponibles = [
+        "britanico",
+        "fomento",
+        "maravillas",
+        "mater",
+        "montealto",
+        "pilar",
+        "recuerdo",
+        "retamar",
+        "sanpablo",
+        "sanpatricio",
+    ]
+
+    for subset in subsets_disponibles:
+        val_dataset = Idefics2Dataset(processor=idefics2_processor, model=idefics2, dataset_name_or_path="de-Rodrigo/merit-secret", subset=subset, split="test", sort_json_key=False)
+
+    val_dataset = ConcatDataset(val_datasets)
+
+    return val_dataset
+
+
 if __name__ == "__main__":
 
     # Define parsing values
@@ -503,6 +544,8 @@ if __name__ == "__main__":
         print("Waiting for debugger to connect...")
         debugpy.wait_for_client()
 
+    login(token=os.getenv("HUGGINGFACE_HUB_TOKEN"))
+    
     # Load Processor
     idefics2_processor = AutoProcessor.from_pretrained("HuggingFaceM4/idefics2-8b", do_image_splitting=False)
 
@@ -511,8 +554,10 @@ if __name__ == "__main__":
 
     # Load dataset partitions
     train_dataset = Idefics2Dataset(processor=idefics2_processor, model=idefics2, dataset_name_or_path=args.dataset, subset=args.subset, split="train", sort_json_key=False)
-    val_dataset = Idefics2Dataset(processor=idefics2_processor, model=idefics2, dataset_name_or_path=args.dataset, subset=args.subset, split="validation", sort_json_key=False)
     
+    # val_dataset = Idefics2Dataset(processor=idefics2_processor, model=idefics2, dataset_name_or_path=args.dataset, subset=args.subset, split="validation", sort_json_key=False)
+    val_dataset = load_secret_dataset()
+        
     # Apply Parameter-Efficient Fine-Tuning (PEFT)
     if not USE_ADD_ADAPTER:
         idefics2 = apply_peft()
