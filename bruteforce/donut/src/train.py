@@ -119,7 +119,9 @@ class DonutModelPLModule(pl.LightningModule):
 class DonutDataset(Dataset):
     """
     PyTorch Dataset for Donut. Loads a HuggingFace Dataset and optionally filters
-    samples based on their image filename.
+    samples based on their image filename. If the subset lacks image paths, loads
+    the base "es-digital-seq" to extract filenames and indices, then applies these
+    indices to the actual subset (e.g., "es-digital-zoom-degradation-seq").
 
     Args:
         dataset_name_or_path (str): Name of the dataset on Hugging Face or local path.
@@ -130,8 +132,10 @@ class DonutDataset(Dataset):
         task_start_token (str): Special start token for the decoder.
         prompt_end_token (str): Special end token for the decoder.
         sort_json_key (bool): Whether to sort JSON keys in output.
-        filter_substring (str or List[str], optional): Substring o lista de substrings
-            que el nombre de la imagen debe contener.
+        filter_substring (str or List[str], optional): Substring or list of substrings
+            that the image filename must contain.
+        base_subset (str): Fallback subset to load filenames from if current subset
+            lacks image paths. Defaults to "es-digital-seq".
     """
 
     def __init__(
@@ -144,7 +148,8 @@ class DonutDataset(Dataset):
         task_start_token: str = "<s>",
         prompt_end_token: str = None,
         sort_json_key: bool = True,
-        filter_substring: Union[str, List[str]] = None,  # <-- aquí
+        filter_substring: Union[str, List[str]] = None,
+        base_subset: str = "es-digital-seq",
     ):
         super().__init__()
 
@@ -152,20 +157,60 @@ class DonutDataset(Dataset):
         self.split = split
         self.ignore_id = ignore_id
         self.task_start_token = task_start_token
-        self.prompt_end_token = prompt_end_token if prompt_end_token else task_start_token
+        self.prompt_end_token = prompt_end_token or task_start_token
         self.sort_json_key = sort_json_key
 
-
-        # Normaliza a lista de substrings
+        # Normalize filter_substring to a list
         if filter_substring:
-            if isinstance(filter_substring, str):
-                self.filter_substring = [filter_substring]
-            else:
-                self.filter_substring = filter_substring
+            self.filter_substring = (
+                [filter_substring]
+                if isinstance(filter_substring, str)
+                else filter_substring
+            )
         else:
             self.filter_substring = None
 
-        # Load the dataset
+        # Determine if we need fallback for filenames
+        name_indices = None
+        # if self.filter_substring and subset != base_subset:
+        if self.filter_substring:
+            # Load base dataset to extract filenames and indices
+            name_ds = load_dataset(
+                dataset_name_or_path,
+                name=base_subset,
+                split=self.split,
+                num_proc=8
+            )
+            # Identify image column in base
+            name_image_cols = [col for col, feat in name_ds.features.items()
+                                if isinstance(feat, Image_d)]
+            if not name_image_cols:
+                raise RuntimeError(
+                    f"Error: no image column in base subset '{base_subset}'. "
+                    f"Available columns: {list(name_ds.features.keys())}"
+                )
+            name_col = name_image_cols[0]
+            # Cast to get path only
+            name_ds = name_ds.cast_column(name_col, Image_d(decode=False))
+
+            # Manually record indices where any substring is in the path
+            substrs = self.filter_substring
+            try:
+                name_indices = [
+                    i for i, ex in enumerate(name_ds)
+                    if any(sub in ex[name_col]["path"] for sub in substrs)
+                ]
+            except Exception as e:
+                raise RuntimeError(
+                    f"Error while extracting indices from base subset: {e}"
+                )
+
+            if not name_indices:
+                raise RuntimeError(
+                    f"No samples in base subset '{base_subset}' match substrings {substrs!r}."
+                )
+
+        # Load the actual subset dataset
         self.dataset = load_dataset(
             dataset_name_or_path,
             name=subset,
@@ -173,35 +218,44 @@ class DonutDataset(Dataset):
             num_proc=8
         )
 
-        # Apply filename filter if provided
+        # If fallback indices exist, apply them
+        if name_indices is not None:
+            self.dataset = self.dataset.select(name_indices)
+
+        # Now apply image filtering on the loaded dataset if needed
         if self.filter_substring:
-            image_column = next(
-                col for col, feat in self.dataset.features.items()
-                if isinstance(feat, Image_d)
-            )
+            # Identify image column(s)
+            image_cols = [col for col, feat in self.dataset.features.items()
+                          if isinstance(feat, Image_d)]
+            if not image_cols:
+                raise RuntimeError(
+                    f"Error: no image column found in subset '{subset}'. "
+                    f"Available columns: {list(self.dataset.features.keys())}"
+                )
+            image_column = image_cols[0]
+
+            # Cast to disable decoding for path access
             self.dataset = self.dataset.cast_column(
                 image_column,
                 Image_d(decode=False)
             )
 
-            # Filtra si **cualquiera** de los substrings está en el path
-            substrs = self.filter_substring  # lista de strings
-            self.dataset = self.dataset.filter(
-                lambda ex: any(sub in ex[image_column]["path"] for sub in substrs)
-            )
-
-            # Mostrar ejemplos para verificar
-            sample_records = self.dataset.select(range(min(10, len(self.dataset))))
+            # Show sample filenames for verification
+            sample_limit = min(10, len(self.dataset))
+            sample_records = self.dataset.select(range(sample_limit))
             filenames = [rec[image_column]["path"] for rec in sample_records]
-            print("First 10 filenames matching any of", substrs, ":", filenames)
+            print(f"First {sample_limit} filenames after fallback and filtering: {filenames}")
 
-            # Re-cast back to decoded images para __getitem__
+            # Re-cast back to decoded images for __getitem__
             self.dataset = self.dataset.cast_column(
                 image_column,
                 Image_d(decode=True)
             )
 
-        # Calcular longitud tras el filtro
+            print(f"Loaded {len(self.dataset)} samples after applying filter {self.filter_substring!r}.")
+        else:
+            print(f"Loaded {len(self.dataset)} samples.")
+
         self.dataset_length = len(self.dataset)
         if self.filter_substring:
             print(f"Loaded {self.dataset_length} samples after applying filter {self.filter_substring!r}.")
@@ -459,6 +513,22 @@ def load_session_datasets(dataset_name: str, subset: str = "", school_name_subse
     return train_dataset, val_dataset
 
 
+def load_session_dataset_train(dataset_name: str, subset: str = "", school_name_subsets: str = None, split: str = "train"): 
+    
+    train_dataset = DonutDataset(
+        dataset_name,
+        subset=subset,
+        max_length=max_length,
+        split=split,
+        task_start_token="<s_cord-v2>",
+        prompt_end_token="<s_cord-v2>",
+        sort_json_key=False,
+        filter_substring=school_name_subsets
+    )
+
+    return train_dataset
+
+
 def load_secret_dataset(dataset_name: str, subsets: list):
 
     train_datasets = []
@@ -583,6 +653,49 @@ if __name__ == "__main__":
         ]
         train_dataset, val_dataset = load_secret_dataset(dataset, subsets_disponibles)
 
+    elif dataset == "de-Rodrigo/merit-aux":
+        
+        train_dataset = []
+
+        train_ds_table = load_session_dataset_train(dataset_name=dataset, subset=dataset_subsets[0])
+        train_dataset.append(train_ds_table)
+
+        train_ds_alpha = load_session_dataset_train(dataset_name="de-Rodrigo/merit", subset="es-digital-seq", school_name_subsets="britanico", split="test")
+        train_dataset.append(train_ds_alpha)
+
+        train_dataset = ConcatDataset(train_dataset)
+
+        if test_real:
+            dataset = "de-Rodrigo/merit-secret"
+            subsets_disponibles = ['britanico', 'fomento', 'maravillas', 'mater', 'montealto', 'pilar', 'recuerdo', 'retamar', 'sanpablo', 'sanpatricio']
+            val_dataset = load_secret_dataset_as_validation(dataset, subsets_disponibles)
+
+    elif dataset == "combination":
+
+        train_dataset = []
+        val_dataset = []
+
+        dataset_subsets = ["es-render-seq"]
+
+        for subset in dataset_subsets:
+            train_ds, val_ds = load_session_datasets(dataset_name="de-Rodrigo/merit", subset=subset, school_name_subsets=school_name_subsets)
+            train_dataset.append(train_ds)
+            # val_dataset.append(val_ds)
+
+        train_ds_table = load_session_dataset_train(dataset_name="de-Rodrigo/merit-aux", subset="retamar_train-asc-synth")
+        train_dataset.append(train_ds_table)
+
+        train_ds_alpha = load_session_dataset_train(dataset_name="de-Rodrigo/merit", subset="es-digital-seq", school_name_subsets="britanico", split="test")
+        train_dataset.append(train_ds_alpha)
+
+        train_dataset = ConcatDataset(train_dataset)
+        # val_dataset = ConcatDataset(val_dataset)
+
+        if test_real:
+            dataset = "de-Rodrigo/merit-secret"
+            subsets_disponibles = ['britanico', 'fomento', 'maravillas', 'mater', 'montealto', 'pilar', 'recuerdo', 'retamar', 'sanpablo', 'sanpatricio']
+            val_dataset = load_secret_dataset_as_validation(dataset, subsets_disponibles)
+
     else:
 
         train_dataset = []
@@ -645,6 +758,9 @@ if __name__ == "__main__":
     
     if freeze_encoder:
         session_name += "-frozen-encoder"
+
+    if dataset == "combination":
+        session_name += "-combination"
 
 
     wandb_logger = WandbLogger(project="Donut", name=session_name)
