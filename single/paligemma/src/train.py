@@ -2,7 +2,7 @@ import argparse
 from huggingface_hub import login, HfApi
 from datasets import load_dataset
 import os
-from torch.utils.data import Dataset, DataLoader, SubsetRandomSampler
+from torch.utils.data import Dataset, DataLoader, SubsetRandomSampler, ConcatDataset
 from typing import Any, List, Dict
 import random
 import json
@@ -23,6 +23,8 @@ from PIL import Image
 import io
 import numpy as np
 import copy
+import ast
+
 
 HF_CARD_FILES = [
     "/app/src/card/README.md",
@@ -32,10 +34,35 @@ HF_CARD_FILES = [
 
 REPO_ID = "google/paligemma-3b-pt-224"
 MAX_LENGTH = 512
-WANDB_PROJECT = "MERIT-Dataset-Img2Sequence"
+WANDB_PROJECT = "Paligemma"
 
 
 PROMPT = "extract JSON."
+
+def load_secret_dataset(repo_id: str):
+
+    val_datasets = []
+    
+    dataset_subsets = [
+        "britanico",
+        "fomento",
+        "maravillas",
+        "mater",
+        "montealto",
+        "pilar",
+        "recuerdo",
+        "retamar",
+        "sanpablo",
+        "sanpatricio",
+    ]
+
+    for subset in dataset_subsets:
+        val_ds = CustomDataset(repo_id, subset, split="test")
+        val_datasets.append(val_ds)
+
+    val_dataset = ConcatDataset(val_datasets)
+
+    return val_dataset
 
 
 class CustomDataset(Dataset):
@@ -57,7 +84,7 @@ class CustomDataset(Dataset):
         self.split = split
         self.sort_json_key = sort_json_key
 
-        if dataset_name_or_path == "de-Rodrigo/merit":
+        if dataset_name_or_path == "de-Rodrigo/merit" or dataset_name_or_path == "de-Rodrigo/merit-secret":
             self.dataset = load_dataset(dataset_name_or_path, name=subset, split=self.split, num_proc=8)
         else:
             self.dataset = load_dataset(dataset_name_or_path, split=self.split, num_proc=8)
@@ -65,12 +92,22 @@ class CustomDataset(Dataset):
 
         self.gt_token_sequences = []
 
-        if dataset_name_or_path == "de-Rodrigo/merit" or dataset_name_or_path == "naver-clova-ix/cord-v2":
+        if dataset_name_or_path in (
+            "de-Rodrigo/merit", 
+            "naver-clova-ix/cord-v2", 
+            "de-Rodrigo/merit-secret"
+        ):
             for sample in self.dataset:
-                ground_truth = json.loads(sample["ground_truth"])
+                if dataset_name_or_path == "de-Rodrigo/merit-secret":
+                    ground_truth = ast.literal_eval(sample["ground_truth"])
+                else:
+                    ground_truth = json.loads(sample["ground_truth"])
+                
                 if "gt_parses" in ground_truth:  # when multiple ground truths are available, e.g., docvqa
                     assert isinstance(ground_truth["gt_parses"], list)
                     gt_jsons = ground_truth["gt_parses"]
+                elif isinstance(ground_truth, dict):
+                    gt_jsons = [ground_truth]
                 else:
                     assert "gt_parse" in ground_truth and isinstance(ground_truth["gt_parse"], dict)
                     gt_jsons = [ground_truth["gt_parse"]]
@@ -158,7 +195,7 @@ class CustomDataset(Dataset):
 
 
 class PaliGemmaModelPLModule(L.LightningModule):
-    def __init__(self, config, processor, model):
+    def __init__(self, config, processor, model, freeze_encoder):
         super().__init__()
         self.config = config
         self.processor = processor
@@ -177,6 +214,18 @@ class PaliGemmaModelPLModule(L.LightningModule):
             ignore_index=pad_id,
         )
         self.pad_id = pad_id
+
+        if freeze_encoder:
+            if hasattr(self.model, "vision_tower"):
+                for p in self.model.vision_tower.parameters():
+                    p.requires_grad = False
+                self.model.vision_tower.eval()
+            elif hasattr(self.model, "vision_model"):
+                for p in self.model.vision_model.parameters():
+                    p.requires_grad = False
+                self.model.vision_model.eval()
+            else:
+                print("⚠️ No se encontró vision encoder en el modelo PaliGemma")
 
 
     def training_step(self, batch, batch_idx):
@@ -500,14 +549,14 @@ if __name__ == "__main__":
     parser.add_argument("--dataset_subsets", type=str)
     # parser.add_argument("--test_dataset_version", type=str)
     # parser.add_argument("--dataset_subsets", type=str, action='append')
-    # parser.add_argument("--freeze_encoder", action="store_true", default=False)
+    parser.add_argument("--freeze_encoder", action="store_true", default=False)
     args = parser.parse_args()
 
     dataset_name = args.dataset_name
     dataset_subsets = args.dataset_subsets
+    freeze_encoder = args.freeze_encoder
     # test_dataset_version = args.test_dataset_version
-    model_output_name = "".join(["paligemma-", dataset_name.split('/')[-1]])
-
+    model_output_name = "".join(["paligemma-vrdu-", dataset_name.split('/')[-1]])
 
     login(token=os.getenv("HUGGINGFACE_HUB_TOKEN"))
 
@@ -530,15 +579,14 @@ if __name__ == "__main__":
     
     model = get_peft_model(model, lora_config)
     model.print_trainable_parameters()
-   
+
     session_name = "_".join([dataset_subsets])
     session_name = f"paligemma_{session_name}"
 
     train_dataset = CustomDataset(dataset_name, dataset_subsets, split="train")
-    val_dataset = CustomDataset(dataset_name, dataset_subsets, split="validation")
-
-
+    # val_dataset = CustomDataset(dataset_name, dataset_subsets, split="validation")
     # test_dataset = CustomDataset(dataset_name, test_dataset_version, split="test")
+    val_dataset = load_secret_dataset("de-Rodrigo/merit-secret")
 
     processor = AutoProcessor.from_pretrained(REPO_ID)
 
@@ -557,11 +605,11 @@ if __name__ == "__main__":
         "verbose": True,
     }
 
-    model_module = PaliGemmaModelPLModule(config, processor, model)
+    model_module = PaliGemmaModelPLModule(config, processor, model, freeze_encoder)
 
     # early_stop_callback = EarlyStopping(monitor="val_edit_distance", patience=3, verbose=False, mode="min")
     wandb.login(key=os.getenv("WANDB_API_KEY"))
-    wandb_logger = WandbLogger(project=WANDB_PROJECT, name=session_name, entity="iderodrigo")
+    wandb_logger = WandbLogger(project=WANDB_PROJECT, name=session_name, entity="ciclab-comillas")
 
     trainer = L.Trainer(
         accelerator="gpu",
