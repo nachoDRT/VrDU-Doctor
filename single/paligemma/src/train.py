@@ -35,7 +35,7 @@ HF_CARD_FILES = [
 REPO_ID = "google/paligemma-3b-pt-224"
 MAX_LENGTH = 512
 WANDB_PROJECT = "Paligemma"
-
+MODEL_REPO_ID = "de-Rodrigo/paligemma-merit"
 
 PROMPT = "extract JSON."
 
@@ -540,6 +540,37 @@ def eval_collate_fn(examples):
         answers,
     )
 
+def save_and_push_model(processor, model, repo_id, dataset_subset, save_dir, commit_message):
+
+    os.makedirs(save_dir, exist_ok=True)
+    checkpoint_dir = os.path.join(save_dir, "initial_checkpoint")
+    os.makedirs(checkpoint_dir, exist_ok=True)
+    
+    # Guardar modelo y procesador
+    model.save_pretrained(checkpoint_dir)
+    processor.save_pretrained(checkpoint_dir)
+    
+    # Subir al hub
+    login(token=os.getenv("HUGGINGFACE_HUB_TOKEN"))
+    api = HfApi()
+    api.upload_folder(
+        folder_path=checkpoint_dir,
+        path_in_repo=dataset_subset,
+        repo_id=repo_id,
+        repo_type="model",
+        commit_message=commit_message
+    )
+
+    for file in HF_CARD_FILES:
+        print(f"Uploading {file} to {repo_id}")
+        api.upload_file(
+            path_or_fileobj=file,
+            path_in_repo='/'.join(file.split('/')[4:]),
+            repo_id=repo_id,
+            repo_type="model",
+            commit_message="Uploading additional files"
+        )
+
 
 
 if __name__ == "__main__":
@@ -550,11 +581,13 @@ if __name__ == "__main__":
     # parser.add_argument("--test_dataset_version", type=str)
     # parser.add_argument("--dataset_subsets", type=str, action='append')
     parser.add_argument("--freeze_encoder", action="store_true", default=False)
+    parser.add_argument("--save_initial", action="store_true", default=False)
     args = parser.parse_args()
 
     dataset_name = args.dataset_name
     dataset_subsets = args.dataset_subsets
     freeze_encoder = args.freeze_encoder
+    save_initial = args.save_initial
     # test_dataset_version = args.test_dataset_version
     model_output_name = "".join(["paligemma-vrdu-", dataset_name.split('/')[-1]])
 
@@ -590,8 +623,20 @@ if __name__ == "__main__":
 
     processor = AutoProcessor.from_pretrained(REPO_ID)
 
+    if save_initial:
+        save_and_push_model(
+            processor=processor,
+            model=model,
+            repo_id=MODEL_REPO_ID,
+            dataset_subset="vanilla",
+            save_dir="./initial_checkpoint",
+            commit_message="Initial model upload (vanilla, but LoRA configured)"
+        )
+        print("Initial model has been uploaded.")
+        exit()
+
     config = {
-        "max_epochs": 50,
+        "max_epochs": 20,
         "val_check_interval": 0.2,
         "check_val_every_n_epoch": 1,
         "gradient_clip_val": 1.0,

@@ -4,8 +4,10 @@ chmod +x src/inference.py
 
 python src/train.py \
     --dataset_name de-Rodrigo/merit \
-    --dataset_subset es-digital-paragraph-degradation-seq \
-    --freeze_encoder \
+    --dataset_subset es-render-seq \
+    --save_initial
+    # --freeze_encoder \
+    
 
 # python src/train.py \
 #     --dataset_name dvgodoy/rvl_cdip_mini \
@@ -28,4 +30,11 @@ python src/train.py \
 #     --subset_name rvl_cdip_mini \
 #     --paligemma_model_version de-Rodrigo/paligemma-merit \
 #     --subfolder paligemma_cord-v2
+
+# python src/inference.py \
+#     --dataset_name de-Rodrigo/merit-secret \
+#     --subset_name all \
+#     --paligemma_model_version de-Rodrigo/paligemma-merit \
+#     --subfolder paligemma_es-render-seq \
+#     # --paligemma_model_version nielsr/paligemma-cord-demo
     
