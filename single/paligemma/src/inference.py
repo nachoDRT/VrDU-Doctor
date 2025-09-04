@@ -2,7 +2,7 @@ from transformers import AutoProcessor, PaliGemmaForConditionalGeneration, BitsA
 from huggingface_hub import HfApi, HfFolder
 import os
 import logging
-from datasets import load_dataset
+from datasets import load_dataset, get_dataset_config_names
 import argparse
 from donut import JSONParseEvaluator
 import numpy as np
@@ -16,9 +16,7 @@ from peft import PeftModel, prepare_model_for_kbit_training
 from PIL import Image
 
 
-WANDB_PROJECT = "MERIT-Dataset-Img2Sequence"
-FINETUNED_MODEL_ID = "nielsr/paligemma-cord-demo"
-# REPO_ID = "google/paligemma-3b-pt-224"
+WANDB_PROJECT = "Paligemma"
 MAX_LENGTH = 512
 PROMPT = "extract JSON."
 LIMIT = 218
@@ -35,18 +33,18 @@ def init_hf_hub():
 
 
 def init_wandb():
-    session_name = f"paligemma_test_{subset_name}"
+    session_name = f"paligemma_test_{subfolder}"
     # Inicia un run y un logger de Lightning
     run = wandb.init(
         project=WANDB_PROJECT,
         name=session_name,
-        entity="iderodrigo",
+        entity="ciclab-comillas",
         reinit=True
     )
     wandb_logger = WandbLogger(
         project=WANDB_PROJECT,
         name=session_name,
-        entity="iderodrigo",
+        entity="ciclab-comillas",
         log_model=False
     )
     return run, wandb_logger
@@ -92,7 +90,7 @@ def get_paligemma(paligemma_model_version: str, subfolder: str):
 def get_dataset_iterator(dataset_name: str, subset_name: str):
     log_info("Loading Dataset")
 
-    if dataset_name == "de-Rodrigo/merit":
+    if dataset_name in ("de-Rodrigo/merit", "de-Rodrigo/merit-secret"):
         dataset = load_dataset(
             dataset_name, subset_name, split="test", streaming=True
         )
@@ -172,9 +170,12 @@ def get_sample_data(sample):
     if img.mode != "RGB":
         img = img.convert("RGB")
 
-    if dataset_name == "de-Rodrigo/merit" or dataset_name == "naver-clova-ix/cord-v2":
+    if dataset_name in ("de-Rodrigo/merit",
+        "naver-clova-ix/cord-v2", 
+        "de-Rodrigo/merit-secret"):
+        
         gt = sample["ground_truth"]
-        if dataset_name == "de-Rodrigo/merit":
+        if dataset_name in ("de-Rodrigo/merit", "de-Rodrigo/merit-secret"):
             gt = gt.replace("'", '"')
         gt = json.loads(gt)
 
@@ -187,7 +188,7 @@ def get_sample_data(sample):
         page = {"page_0": words_list}
         gt = {"gt_parse": page}
 
-    print(gt)
+    # print(gt)
 
 
     return img, gt
@@ -220,7 +221,7 @@ def process_dataset(dataset_iterator):
             num_prompt_tokens = num_image_tokens + num_text_tokens + 2
             generated_text = processor.batch_decode(generated_ids[:, num_prompt_tokens:], skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
             generated_json = token2json(generated_text)
-            print("PREDICTION", generated_json)
+            # print("PREDICTION", generated_json)
 
             score = evaluator.cal_acc(generated_json, gt)
 
@@ -252,14 +253,26 @@ if __name__ == "__main__":
     run, wandb_logger = init_wandb()
 
     model, processor = get_paligemma(paligemma_model_version, subfolder)
-    dataset_iter = get_dataset_iterator(dataset_name, subset_name)
+    
+    if subset_name == "all":
+        subsets = get_dataset_config_names(dataset_name)
+    else:
+        subsets = [subset_name]
 
-    # Process dataset
-    accs, outputs_list = process_dataset(dataset_iter)
+    model_acc = []
+    
+    for subset_name in subsets:
+        print(f"Processing {subset_name}")
+        dataset_iter = get_dataset_iterator(dataset_name, subset_name)
 
-    f1 = np.mean(accs)
-    print(f"Mean accuracy {subset_name}: {f1}")
-    print(accs)
+        # Process dataset
+        accs, outputs_list = process_dataset(dataset_iter)
 
-    wandb.log({"test_f1": f1})
+        f1 = np.mean(accs)
+        print(f"Mean accuracy {subset_name}: {f1}")
+        print(accs)
+        model_acc.extend(accs)
+
+    print("\n", model_acc)
+    wandb.log({"test_f1": np.mean(model_acc)})
     run.finish()
