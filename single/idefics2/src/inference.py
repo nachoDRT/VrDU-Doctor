@@ -117,11 +117,13 @@ def get_idefics2():
         "HuggingFaceM4/idefics2-8b",
         torch_dtype=torch.float16,
         quantization_config=quantization_config,
+        device_map="auto",
     )
     model = PeftModel.from_pretrained(
         base_model,
         PEFT_MODEL_ID,
         subfolder=idefics_model_version,
+        device_map="auto",
         # torch_dtype=torch.float16,
         # quantization_config=quantization_config,
     )
@@ -200,6 +202,7 @@ def process_dataset(dataset_iterator, model, processor, prompt):
 
         # Get inputs
         inputs = processor(text=prompt, images=[image], return_tensors="pt").to("cuda")
+        inputs = {k: v.to(device) for k, v in inputs.items()}
 
         # Generate token IDs
         generated_ids = model.generate(**inputs, max_new_tokens=768)
@@ -221,7 +224,7 @@ def process_dataset(dataset_iterator, model, processor, prompt):
         # if i + 1 >= SAMPLES_LIMIT:
         #     break
 
-    return np.mean(accs)
+    return accs
 
 
 def init_hf_hub():
@@ -240,6 +243,7 @@ if __name__ == "__main__":
     subset_name = args.subset
     idefics_model_version = args.model
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     init_hf_hub()
 
     if subset_name == "all":
@@ -259,7 +263,8 @@ if __name__ == "__main__":
     # Config prompt
     i2_prompt, i2_processor = config_prompt(i2_processor)
 
-
+    dataset_accs = []
+    
     for subset_name in subsets:
         print(f"Processing {subset_name}")
 
@@ -268,6 +273,10 @@ if __name__ == "__main__":
         dataset_iter = get_dataset_iterator(dataset_name, subset_name)
 
         # Inference
-        mean_acc = process_dataset(dataset_iter, i2_model, i2_processor, i2_prompt)
+        accs = process_dataset(dataset_iter, i2_model, i2_processor, i2_prompt)
         
-        print(f"Mean accuracy {subset_name}: {mean_acc}")
+        print(accs)
+        print(f"Mean accuracy {subset_name}: {np.mean(accs)}")
+        dataset_accs.extend(accs)
+
+    print(dataset_accs)

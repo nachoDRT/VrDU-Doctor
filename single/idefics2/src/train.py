@@ -18,6 +18,7 @@ from lightning.pytorch.loggers import WandbLogger
 from transformers import AutoProcessor, BitsAndBytesConfig, Idefics2ForConditionalGeneration
 from peft import prepare_model_for_kbit_training, LoraConfig, get_peft_model
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
+import ast
 
 
 """
@@ -33,6 +34,7 @@ USE_ADD_ADAPTER = True
 MAX_LENGTH = 768
 MODEL_REPO_ID = "de-Rodrigo/idefics2-merit"
 HF_CARD_FILES = ["/app/src/card/README.md", "/app/src/card/.huggingface.yaml", "/app/src/card/assets/dragon_huggingface.png"]
+LOGGING_STEPS = 1
 
 
 class Idefics2Dataset(Dataset):
@@ -65,10 +67,16 @@ class Idefics2Dataset(Dataset):
         self.gt_token_sequences = []
         self.added_tokens = []
         for sample in self.dataset:
-            ground_truth = json.loads(sample["ground_truth"])
+            if dataset_name_or_path == "de-Rodrigo/merit-secret":
+                ground_truth = ast.literal_eval(sample["ground_truth"])
+            else:
+                ground_truth = json.loads(sample["ground_truth"])
+            
             if "gt_parses" in ground_truth:
                 assert isinstance(ground_truth["gt_parses"], list)
                 gt_jsons = ground_truth["gt_parses"]
+            elif isinstance(ground_truth, dict):
+                gt_jsons = [ground_truth]
             else:
                 assert "gt_parse" in ground_truth and isinstance(ground_truth["gt_parse"], dict)
                 gt_jsons = [ground_truth["gt_parse"]]
@@ -146,13 +154,54 @@ class Idefics2Dataset(Dataset):
 
 
 class Idefics2ModelPLModule(L.LightningModule):
-    def __init__(self, config, processor, model):
+    def __init__(self, config, processor, model, freeze_encoder):
         super().__init__()
         self.config = config
         self.processor = processor
         self.model = model
 
         self.batch_size = config.get("batch_size")
+
+        if freeze_encoder:
+            # rutas probables en Idefics2 (priorizamos la que has sugerido)
+            candidate_paths = [
+                "base_model.model.model.vision_model",  # PEFT/LoRA-wrapped
+                "model.model.vision_model",             # algunos wrappers
+                "model.vision_model",                   # wrapper simple
+                "vision_model",                         # modelo “puro”
+                "vision_tower",                         # algunos forks
+            ]
+
+            vt = None
+            # resolved_path = None
+            for path in candidate_paths:
+                try:
+                    vt = self._rgetattr(self.model, path)
+                    if vt is not None:
+                        resolved_path = path
+                        break
+                except AttributeError:
+                    continue
+
+            if vt is None:
+                raise AttributeError(
+                    "freeze_encoder=True pero no se encontró el backbone visual. "
+                    "Probé: "
+                    + ", ".join(candidate_paths)
+                    + ". ¿Está el modelo envuelto de otra forma?"
+                )
+
+            for p in vt.parameters():
+                p.requires_grad = False
+            vt.eval()
+            # self.print(f"Visual backbone frozen at self.model.{resolved_path}")
+
+
+    def _rgetattr(self, obj, path):
+        for attr in path.split('.'):
+            obj = getattr(obj, attr)
+        return obj
+
 
     def training_step(self, batch, batch_idx):
 
@@ -463,9 +512,9 @@ def eval_collate_fn(examples, processor, model):
     return input_ids, attention_mask, pixel_values, pixel_attention_mask, answers
 
 
-def init_pl_module(processor, model):
-    configuration = {"max_epochs": 10,
-        "val_check_interval": 0.05,
+def init_pl_module(processor, model, freeze_encoder):
+    configuration = {"max_epochs": 2,
+        "val_check_interval": 0.01,
         "check_val_every_n_epoch": 1,
         "gradient_clip_val": 1.0,
         "accumulate_grad_batches": 8,
@@ -476,9 +525,10 @@ def init_pl_module(processor, model):
         "warmup_steps": 50,
         "result_path": "./result",
         "verbose": True,
+        "logging_steps": LOGGING_STEPS,
     }
 
-    model_module = Idefics2ModelPLModule(configuration, processor, model)
+    model_module = Idefics2ModelPLModule(configuration, processor, model, freeze_encoder)
 
     return model_module, configuration
 
@@ -492,13 +542,18 @@ def train_idefics2(idefics2, configuration):
             devices="auto", # Use available GPUs
             max_epochs=configuration.get("max_epochs"),
             check_val_every_n_epoch=configuration.get("check_val_every_n_epoch"),
+            val_check_interval=configuration.get("val_check_interval"),
             gradient_clip_val=configuration.get("gradient_clip_val"),
             accumulate_grad_batches=configuration.get("accumulate_grad_batches"),
             precision=configuration.get("precision"),
             num_sanity_val_steps=0,
             logger=wandb_logger,
-            callbacks=[PushToHubCallback(MODEL_REPO_ID, args.subset), early_stop_callback],
+            log_every_n_steps=configuration.get("logging_steps", LOGGING_STEPS),
+            callbacks=[PushToHubCallback(MODEL_REPO_ID, args.subset)],
     )
+
+    metrics = trainer.validate(model=idefics2)[0]  # eval fuera del training loop
+    wandb_logger.log_metrics({f"val/{k}": v for k, v in metrics.items()}, step=0)
 
     trainer.fit(idefics2)
 
@@ -522,6 +577,7 @@ def load_secret_dataset():
 
     for subset in subsets_disponibles:
         val_dataset = Idefics2Dataset(processor=idefics2_processor, model=idefics2, dataset_name_or_path="de-Rodrigo/merit-secret", subset=subset, split="test", sort_json_key=False)
+        val_datasets.append(val_dataset)
 
     val_dataset = ConcatDataset(val_datasets)
 
@@ -535,6 +591,7 @@ if __name__ == "__main__":
     parser.add_argument("--debug", required=True, type=str)
     parser.add_argument("--dataset", required=True, type=str)
     parser.add_argument("--subset", default=None, type=str)
+    parser.add_argument("--freeze_encoder", action="store_true", default=False)
     parser.add_argument("--save_initial", action="store_true", help="Save and upload vanilla model (PEFTed, no trained)")
     args = parser.parse_args()
 
@@ -554,7 +611,7 @@ if __name__ == "__main__":
 
     # Load dataset partitions
     train_dataset = Idefics2Dataset(processor=idefics2_processor, model=idefics2, dataset_name_or_path=args.dataset, subset=args.subset, split="train", sort_json_key=False)
-    
+
     # val_dataset = Idefics2Dataset(processor=idefics2_processor, model=idefics2, dataset_name_or_path=args.dataset, subset=args.subset, split="validation", sort_json_key=False)
     val_dataset = load_secret_dataset()
         
@@ -582,7 +639,7 @@ if __name__ == "__main__":
     early_stop_callback = EarlyStopping(monitor="val_edit_distance", patience=4, verbose=False, mode="min")
 
     # Pytorch Lightning module
-    idefics2_module, config = init_pl_module(idefics2_processor, idefics2)
+    idefics2_module, config = init_pl_module(idefics2_processor, idefics2, args.freeze_encoder)
     
     # Train
     train_idefics2(idefics2_module, config)
