@@ -10,6 +10,7 @@ import lightning as L
 import numpy as np
 from huggingface_hub import login, HfApi
 from datasets import load_dataset
+from datasets import Image as Image_d
 from torch.utils.data import Dataset, DataLoader, SubsetRandomSampler, ConcatDataset
 from typing import Any, List, Dict
 from nltk import edit_distance
@@ -52,6 +53,8 @@ class Idefics2Dataset(Dataset):
         subset: str,
         split: str = "train",
         sort_json_key: bool = True,
+        filter_substring= None,
+        base_subset: str = "es-digital-seq",
     ):
         super().__init__()
 
@@ -61,8 +64,106 @@ class Idefics2Dataset(Dataset):
         self.processor = processor
         self.model = model
 
-        self.dataset = load_dataset(dataset_name_or_path, name=subset, split=self.split)
+        # Normalize filter_substring to a list
+        if filter_substring:
+            self.filter_substring = (
+                [filter_substring]
+                if isinstance(filter_substring, str)
+                else filter_substring
+            )
+        else:
+            self.filter_substring = None
+
+        # Determine if we need fallback for filenames
+        name_indices = None
+        # if self.filter_substring and subset != base_subset:
+        if self.filter_substring:
+            # Load base dataset to extract filenames and indices
+            name_ds = load_dataset(
+                dataset_name_or_path,
+                name=base_subset,
+                split=self.split,
+                num_proc=8
+            )
+            # Identify image column in base
+            name_image_cols = [col for col, feat in name_ds.features.items()
+                                if isinstance(feat, Image_d)]
+            if not name_image_cols:
+                raise RuntimeError(
+                    f"Error: no image column in base subset '{base_subset}'. "
+                    f"Available columns: {list(name_ds.features.keys())}"
+                )
+            name_col = name_image_cols[0]
+            # Cast to get path only
+            name_ds = name_ds.cast_column(name_col, Image_d(decode=False))
+
+            # Manually record indices where any substring is in the path
+            substrs = self.filter_substring
+            try:
+                name_indices = [
+                    i for i, ex in enumerate(name_ds)
+                    if any(sub in ex[name_col]["path"] for sub in substrs)
+                ]
+            except Exception as e:
+                raise RuntimeError(
+                    f"Error while extracting indices from base subset: {e}"
+                )
+
+            if not name_indices:
+                raise RuntimeError(
+                    f"No samples in base subset '{base_subset}' match substrings {substrs!r}."
+                )
+
+        self.dataset = load_dataset(dataset_name_or_path, name=subset, split=self.split, num_proc=8)
+        
+        # If fallback indices exist, apply them
+        if name_indices is not None:
+            self.dataset = self.dataset.select(name_indices)
+
+        # Now apply image filtering on the loaded dataset if needed
+        if self.filter_substring:
+            # Identify image column(s)
+            image_cols = [col for col, feat in self.dataset.features.items()
+                          if isinstance(feat, Image_d)]
+            if not image_cols:
+                raise RuntimeError(
+                    f"Error: no image column found in subset '{subset}'. "
+                    f"Available columns: {list(self.dataset.features.keys())}"
+                )
+            image_column = image_cols[0]
+
+            # Cast to disable decoding for path access
+            self.dataset = self.dataset.cast_column(
+                image_column,
+                Image_d(decode=False)
+            )
+
+            # Show sample filenames for verification
+            sample_limit = min(10, len(self.dataset))
+            sample_records = self.dataset.select(range(sample_limit))
+            filenames = [rec[image_column]["path"] for rec in sample_records]
+            print(f"First {sample_limit} filenames after fallback and filtering: {filenames}")
+
+            # Re-cast back to decoded images for __getitem__
+            self.dataset = self.dataset.cast_column(
+                image_column,
+                Image_d(decode=True)
+            )
+
+            print(f"Loaded {len(self.dataset)} samples after applying filter {self.filter_substring!r}.")
+        else:
+            print(f"Loaded {len(self.dataset)} samples.")
+
         self.dataset_length = len(self.dataset)
+
+
+
+
+
+
+
+
+
 
         self.gt_token_sequences = []
         self.added_tokens = []
@@ -535,7 +636,14 @@ def init_pl_module(processor, model, freeze_encoder):
 
 def train_idefics2(idefics2, configuration):
     wandb.login(key=os.getenv("WANDB_API_KEY"))
-    wandb_logger = WandbLogger(project="Idefics2", name=args.subset)
+    session_name = args.subset
+    
+    if args.train_combination:
+        for combination in args.combination_info:
+            if combination[1]:
+                session_name = f"{session_name}_{combination[1]}_{combination[2]}"
+
+    wandb_logger = WandbLogger(project="Idefics2", name=session_name)
 
     trainer = L.Trainer(
             accelerator="gpu",
@@ -549,7 +657,7 @@ def train_idefics2(idefics2, configuration):
             num_sanity_val_steps=0,
             logger=wandb_logger,
             log_every_n_steps=configuration.get("logging_steps", LOGGING_STEPS),
-            callbacks=[PushToHubCallback(MODEL_REPO_ID, args.subset)],
+            callbacks=[PushToHubCallback(MODEL_REPO_ID, session_name)],
     )
 
     metrics = trainer.validate(model=idefics2)[0]  # eval fuera del training loop
@@ -583,6 +691,38 @@ def load_secret_dataset():
 
     return val_dataset
 
+def load_combined_training_dataset(train_dataset):
+    train_dataset = [train_dataset]
+
+    for combination_info in args.combination_info:
+        train_ds = Idefics2Dataset(
+            processor=idefics2_processor,
+            model=idefics2,
+            dataset_name_or_path=combination_info[0],
+            subset=combination_info[1],
+            split=combination_info[2],
+            sort_json_key=False,
+            filter_substring=combination_info[3]
+        )
+        
+        train_dataset.append(train_ds)
+    
+    train_dataset = ConcatDataset(train_dataset)
+
+    return train_dataset
+
+
+def parse_tuple(s):
+    try:
+        elems = s.split(",")
+        if len(elems) == 3:
+            elems.append(None)
+        if len(elems) != 4:
+            raise ValueError
+        return tuple(e.strip() if e is not None else None for e in elems)
+    except ValueError:
+        raise argparse.ArgumentTypeError("Tuples with format elem1,elem2,elem3[,elem4]")
+
 
 if __name__ == "__main__":
 
@@ -592,6 +732,9 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", required=True, type=str)
     parser.add_argument("--subset", default=None, type=str)
     parser.add_argument("--freeze_encoder", action="store_true", default=False)
+    parser.add_argument("--test_real", action="store_true", default=False)
+    parser.add_argument("--train_combination", action="store_true", default=False)
+    parser.add_argument("--combination_info", type=parse_tuple, nargs="+", default=[(None, None, None, None)])
     parser.add_argument("--save_initial", action="store_true", help="Save and upload vanilla model (PEFTed, no trained)")
     args = parser.parse_args()
 
@@ -611,9 +754,14 @@ if __name__ == "__main__":
 
     # Load dataset partitions
     train_dataset = Idefics2Dataset(processor=idefics2_processor, model=idefics2, dataset_name_or_path=args.dataset, subset=args.subset, split="train", sort_json_key=False)
+    if args.train_combination:
+        train_dataset = load_combined_training_dataset(train_dataset)
 
-    # val_dataset = Idefics2Dataset(processor=idefics2_processor, model=idefics2, dataset_name_or_path=args.dataset, subset=args.subset, split="validation", sort_json_key=False)
-    val_dataset = load_secret_dataset()
+    if args.test_real:
+        val_dataset = load_secret_dataset()
+    else:
+        val_dataset = Idefics2Dataset(processor=idefics2_processor, model=idefics2, dataset_name_or_path=args.dataset, subset=args.subset, split="validation", sort_json_key=False)
+
         
     # Apply Parameter-Efficient Fine-Tuning (PEFT)
     if not USE_ADD_ADAPTER:
