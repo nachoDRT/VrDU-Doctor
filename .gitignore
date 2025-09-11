@@ -18,6 +18,7 @@ embeddings/donut/results
 embeddings/donut/config
 embeddings/idefics2/config
 embeddings/paligemma/config
+embeddings/llava/config
 
 postprocess/models/*/
 !postprocess/models/*.*
