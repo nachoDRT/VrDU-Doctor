@@ -1,0 +1,8 @@
+---
+tags:
+- vision
+- document-understanding
+- llava
+metrics:
+- accuracy
+- f1
