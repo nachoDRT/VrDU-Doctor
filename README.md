@@ -7,26 +7,32 @@
 
 
 ## Introduction :information_source:
-Visually-rich Document Understanding (VrDU) consists of a Deep Learning (DL) Model synthesizing or selecting information from documents (images with text) to answer a question or classify a chunk of text. VrDU tasks are multimodal, i.e., models use information from text, images, or even the document layout to solve the tasks.
+Visually-rich Document Understanding (VrDU) consists of a model synthesizing or selecting information from documents (images with text) to answer questions, classify data or extract information. VrDU tasks are multimodal, i.e., models use text, images, or even the document layout to solve the tasks.
 
-Humans have worked with different formats of documents since the beginning of History (inscriptions, cards, books, etc.). Nowadays, we still work with non-digital documents: we still receive a medical record when visiting the doctor or applying to the university with a transcript of records. On the other hand, our lives are increasingly digital: part of our relevant data is digital; therefore, we deal with data transfer from the analogical to the digital domain.
+We usually train VLMs on visual synthetic data that we (as humans) label as photorrealistic. We argue that this is an anthropocentric perspective imposed to a model that might not synthetize visual information as we do. VERSE helps to visualize latent space and overlay visual features to detect poor-performance regions and take action to include better suited training sets to boost model performance.
 
 <p align="center" style="margin-top: 50px; margin-bottom: 50px;">
-  <img src="imgs/introduction.png" alt="Introduction" width="600" /><br>
+  <img src="imgs/introduction.png" alt="Introduction" width="500" /><br>
   <em> Figure 1. Traditionally, the quality of synthetic images in a dataset is assessed from an anthropocentric perspective, answering the question of whether such images appear photorealistic. In contrast, this work proposes evaluating the images from the model’s perspective through visual embedding analysis.
   </em>
 </p>
 
-## Models (TO-DO)
-We are researching with one of the SOTA family models: LayoutLM. We expect to broaden our scope soon:
+## Models 👾
+We use different Vision Language Models (VLMs) with varying visual signal strenght and diverse visual world models. We prove VERSE over those models showing and using stronger visual representations (Donut and Idefics2). 
 
-- [x] LayoutLMv2
-- [x] LayoutXLM
-- [x] LayoutLMv3
-- [ ] Donut
-- [ ] Idefics2
-- [ ] PaliGemma
-- [ ] LLaVA
+| Model                         | Pre-Trained 🤗 version | Input data | Task |
+|------------------------------|--------------|----------|----------|
+| LayoutLMv2     | microsoft/layoutlmv2-base-uncased     | I + T + L| Token classification|
+| LayoutXLM    | microsoft/layoutxlm-base        | I + T + L       |Token classification|
+| LayoutLMv3    | microsoft/layoutlmv3-base        | I + T + L       |Token classification|
+| Donut    | naver-clova-ix/donut-base        | I + T       |Sequence Generation|
+| Idefics2    | HuggingFaceM4/idefics2-8b        | I + T       |Sequence Generation|
+| PaliGemma    | google/paligemma-3b-pt-224       | I + T       |Sequence Generation|
+| LLaVA    | LLaVA-hf/LLaVA-1.5-7b-hf       | I + T       |Sequence Generation|
+
+<em> 
+Table 1. Models pre-considered in this research.
+</em>
 
 ## Datasets 📑
 
@@ -38,7 +44,7 @@ We use the Spanish partition of the MERIT Dataset. The MERIT Dataset is a synthe
 + **Pipeline code:** [MERIT Dataset generation pipeline](https://github.com/nachoDRT/MERIT-Dataset)
 
 <p align="center" style="margin-top: 50px; margin-bottom: 50px;">
-  <img src="imgs/dataset_overview.png" alt="Dataset overview" width="600" /><br>
+  <img src="imgs/dataset_overview.png" alt="Dataset overview" width="500" /><br>
   <em>
     Figure 2. Training samples used. We employ the Spanish-language subsets of the MERIT Dataset, across its different versions (A). Each version comprises data from seven different schools (B). New versions complement the vanilla MERIT Dataset, composed of digital document samples (C) and their renderized versions (D).  More information available in the
     <a href="https://www.sciencedirect.com/science/article/pii/S0031320325011653">MERIT Dataset paper</a>.
@@ -62,25 +68,44 @@ We use MERIT Secret (a real dataset under Non-Disclosure Agreement) as test-dev 
 
 ## Results 📈
 
-WIP :hammer_and_wrench:
-
 <p align="center" style="margin-top: 50px; margin-bottom: 50px;">
-  <img src="imgs/embeddings_animation_PCA_Donut.gif" alt="embeddings animation Donut" width="400" /><br>
+  <img src="imgs/idefics2_boosting.png" alt="boosting Idefics2" width="500" /><br>
   <em>
-    Figure 4. Synthetic training-samples moving across the Reduced Embedding Space (RES) of Donut. Every step shows the same sample under increasing level of visual information (purple). In background, PC maps showing F1 scores of the target (test-dev) samples.
+    Figure 4. We detect conflictive clusters and the main features driving them so we can adjust our training data. In this example, we explore Idefics2 Reduced Embedding Space and boost its performance by combining resonating data that targets conflictive clusters.
 </em>
 </p>
 
 
 
-## Team
+| Model                         | Deployment | Fine-tuned | F1 |
+|------------------------------|--------------|----------|----------|
+| Idefics2     | On-premise     | VERSE | 0.8101|
+| GPT4-O    | API fine-tune        | API fine-tune       |0.7821|
+| Donut    | On-premise        | VERSE       |0.7607|
+| Pixtral    | API-Based        | N/A      |0.7267|
+
+<em> 
+Table 2. Comparison of the best-performing models. After applying the VERSE methodology, on-premise models achieve performance comparable to API-based solutions.
+</em>
+
+<p align="center" style="margin-top: 50px; margin-bottom: 50px;">
+  <img src="imgs/embeddings_animation_PCA_Donut.gif" alt="embeddings animation Donut" width="400" /><br>
+  <em>
+    Figure 5. Synthetic training-samples moving across the Reduced Embedding Space (RES) of Donut. Every step shows the same sample under increasing level of visual information (purple). In background, PC maps showing F1 scores of the target (test-dev) samples.
+</em>
+</p>
+
+## Resources 🧭
+**Explore Reduced Embedding Spaces:** [VERSE Space @ Hugging Face 🤗](https://huggingface.co/spaces/de-Rodrigo/Embeddings)
+
+## Team 🤜🤛
 
 We are researchers from **[Comillas Pontifical University](https://www.iit.comillas.edu/)**
  - **Ignacio de Rodrigo [@nachoDRT](https://github.com/nachoDRT)**: PhD Student.
  - **Álvaro López [@allopez](https://www.iit.comillas.edu/personas/allopez)**: Supervisor.
  - **Jaime Boal [@jboal](https://github.com/jboalml)**: Supervisor.
 
-## Citation
+## Citation 📃✒️
 If you find our research interesting, please cite our works. :page_with_curl::black_nib:
 
 **VERSE**
