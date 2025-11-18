@@ -1,18 +1,18 @@
 # VERSE 📄🔍👀
 ### Visual Embedding Reduction and Space Exploration — Clustering-guided Insights for Training Data Enhancement in V-rDu
 
-<p align="center" style="margin-top: 50px; margin-bottom: 50px;">
-  <img src="imgs/verse.png" alt="verse" width="200" /><br>
+<p align="center" style="margin-top: 100px; margin-bottom: 50px;">
+  <img src="figs/verse.png" alt="verse" width="200" /><br>
 </p>
 
 
-## Introduction :information_source:
+## Introduction ℹ️
 Visually-rich Document Understanding (VrDU) consists of a model synthesizing or selecting information from documents (images with text) to answer questions, classify data or extract information. VrDU tasks are multimodal, i.e., models use text, images, or even the document layout to solve the tasks.
 
 We usually train VLMs on visual synthetic data that we (as humans) label as photorrealistic. We argue that this is an anthropocentric perspective imposed to a model that might not synthetize visual information as we do. VERSE helps to visualize latent space and overlay visual features to detect poor-performance regions and take action to include better suited training sets to boost model performance.
 
 <p align="center" style="margin-top: 50px; margin-bottom: 50px;">
-  <img src="imgs/introduction.png" alt="Introduction" width="500" /><br>
+  <img src="figs/introduction.png" alt="Introduction" width="550" /><br>
   <em> Figure 1. Traditionally, the quality of synthetic images in a dataset is assessed from an anthropocentric perspective, answering the question of whether such images appear photorealistic. In contrast, this work proposes evaluating the images from the model’s perspective through visual embedding analysis.
   </em>
 </p>
@@ -44,7 +44,7 @@ We use the Spanish partition of the MERIT Dataset. The MERIT Dataset is a synthe
 + **Pipeline code:** [MERIT Dataset generation pipeline](https://github.com/nachoDRT/MERIT-Dataset)
 
 <p align="center" style="margin-top: 50px; margin-bottom: 50px;">
-  <img src="imgs/dataset_overview.png" alt="Dataset overview" width="500" /><br>
+  <img src="figs/dataset_overview.png" alt="Dataset overview" width="600" /><br>
   <em>
     Figure 2. Training samples used. We employ the Spanish-language subsets of the MERIT Dataset, across its different versions (A). Each version comprises data from seven different schools (B). New versions complement the vanilla MERIT Dataset, composed of digital document samples (C) and their renderized versions (D).  More information available in the
     <a href="https://www.sciencedirect.com/science/article/pii/S0031320325011653">MERIT Dataset paper</a>.
@@ -58,7 +58,7 @@ We use MERIT Secret (a real dataset under Non-Disclosure Agreement) as test-dev 
 ## Methodology 🔄
 
 <p align="center" style="margin-top: 50px; margin-bottom: 50px;">
-  <img src="imgs/methodology.png" alt="Methodology" width="600" /><br>
+  <img src="figs/methodology.png" alt="Methodology" width="700" /><br>
   <em>
     Figure 3. VERSE methodology. More information available in the
     <a href="https://arxiv.org/">VERSE paper</a>.
@@ -69,13 +69,19 @@ We use MERIT Secret (a real dataset under Non-Disclosure Agreement) as test-dev 
 ## Results 📈
 
 <p align="center" style="margin-top: 50px; margin-bottom: 50px;">
-  <img src="imgs/idefics2_boosting.png" alt="boosting Idefics2" width="500" /><br>
+  <img src="figs/idefics2_boosting.png" alt="boosting Idefics2" width="600" /><br>
   <em>
     Figure 4. We detect conflictive clusters and the main features driving them so we can adjust our training data. In this example, we explore Idefics2 Reduced Embedding Space and boost its performance by combining resonating data that targets conflictive clusters.
 </em>
 </p>
 
 
+<p align="center" style="margin-top: 50px; margin-bottom: 50px;">
+  <img src="figs/embeddings_animation_PCA_Donut.gif" alt="embeddings animation Donut" width="400" /><br>
+  <em>
+    Figure 5. Synthetic training-samples moving across the Reduced Embedding Space (RES) of Donut. Every step shows the same sample under increasing level of visual information (purple). In background, PC maps showing F1 scores of the target (test-dev) samples.
+</em>
+</p>
 
 | Model                         | Deployment | Fine-tuned | F1 |
 |------------------------------|--------------|----------|----------|
@@ -87,14 +93,6 @@ We use MERIT Secret (a real dataset under Non-Disclosure Agreement) as test-dev 
 <em> 
 Table 2. Comparison of the best-performing models. After applying the VERSE methodology, on-premise models achieve performance comparable to API-based solutions.
 </em>
-
-<p align="center" style="margin-top: 50px; margin-bottom: 50px;">
-  <img src="imgs/embeddings_animation_PCA_Donut.gif" alt="embeddings animation Donut" width="400" /><br>
-  <em>
-    Figure 5. Synthetic training-samples moving across the Reduced Embedding Space (RES) of Donut. Every step shows the same sample under increasing level of visual information (purple). In background, PC maps showing F1 scores of the target (test-dev) samples.
-</em>
-</p>
-
 ## Resources 🧭
 **Explore Reduced Embedding Spaces:** [VERSE Space @ Hugging Face 🤗](https://huggingface.co/spaces/de-Rodrigo/Embeddings)
 
