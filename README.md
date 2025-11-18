@@ -2,7 +2,7 @@
 ### Visual Embedding Reduction and Space Exploration — Clustering-guided Insights for Training Data Enhancement in V-rDu
 
 <p align="center" style="margin-top: 100px; margin-bottom: 50px;">
-  <img src="figs/verse.png" alt="verse" width="200" /><br>
+  <img src="figs/verse_huggy.png" alt="verse" width="450" /><br>
 </p>
 
 
@@ -93,6 +93,7 @@ We use MERIT Secret (a real dataset under Non-Disclosure Agreement) as test-dev 
 <em> 
 Table 2. Comparison of the best-performing models. After applying the VERSE methodology, on-premise models achieve performance comparable to API-based solutions.
 </em>
+
 ## Resources 🧭
 **Explore Reduced Embedding Spaces:** [VERSE Space @ Hugging Face 🤗](https://huggingface.co/spaces/de-Rodrigo/Embeddings)
 
